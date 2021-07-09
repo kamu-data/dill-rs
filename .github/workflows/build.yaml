@@ -1,0 +1,18 @@
+name: build
+on: [push]
+#on:
+#  push:
+#    branches:
+#      - master
+#  pull_request:
+#    branches:
+#      - master
+jobs:
+  test_linux:
+    name: Test / Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+      - run: cargo build
+      - run: cargo test --verbose
