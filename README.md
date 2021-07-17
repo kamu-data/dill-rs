@@ -12,7 +12,7 @@
 
 # TODO
 - value by reference in new()
-- + Send + Sync plague
+- + Send + Sync plague  https://www.reddit.com/r/rust/comments/6dz0xh/abstracting_over_reference_counted_types_rc_and/
 - scopes
   - invocation
   - thread

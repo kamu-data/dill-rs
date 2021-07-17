@@ -9,7 +9,7 @@ use crate::{Catalog, InjectionError};
 
 /// Builders are responsible for resolving dependencies,
 /// delegating lifetime management to scopes, and creating new instances
-pub trait Builder {
+pub trait Builder: Send + Sync {
     fn instance_type_id(&self) -> TypeId;
     fn instance_type_name(&self) -> &'static str;
     fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError>;
@@ -94,7 +94,7 @@ where
 
 impl<Fct, Impl> Builder for Factory<Fct, Impl>
 where
-    Fct: Fn() -> Impl,
+    Fct: Fn() -> Impl + Send + Sync,
     Impl: 'static + Send + Sync,
 {
     fn instance_type_id(&self) -> TypeId {
@@ -112,7 +112,7 @@ where
 
 impl<Fct, Impl> TypedBuilder<Impl> for Factory<Fct, Impl>
 where
-    Fct: Fn() -> Impl,
+    Fct: Fn() -> Impl + Send + Sync,
     Impl: 'static + Send + Sync,
 {
     fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {

@@ -217,7 +217,7 @@ fn implement_arg(
         proc_macro2::TokenStream::new()
     } else {
         quote! {
-            #override_fn_name: Option<Box<dyn Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError>>>,
+            #override_fn_name: Option<Box<dyn Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + Send + Sync>>,
         }
     };
 
@@ -240,7 +240,7 @@ fn implement_arg(
 
             pub fn #setter_fn_name(
                 mut self,
-                fun: impl Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + 'static
+                fun: impl Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + 'static + Send + Sync
             ) -> #builder {
                 self.#override_fn_name = Some(Box::new(fun));
                 self

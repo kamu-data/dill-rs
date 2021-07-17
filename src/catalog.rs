@@ -2,7 +2,6 @@ use std::{
     any::{Any, TypeId},
     collections::HashMap,
     marker::{PhantomData, Unsize},
-    rc::Rc,
     sync::Arc,
 };
 
@@ -60,7 +59,7 @@ struct TypeCaster<Into: ?Sized> {
     cast_arc: fn(Arc<dyn Any + Send + Sync>) -> Arc<Into>,
 }
 
-type AnyTypeCaster = dyn Any;
+type AnyTypeCaster = dyn Any + Send + Sync;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -72,8 +71,10 @@ struct ImplTypeId(TypeId);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: CoW?
+#[derive(Clone)]
 pub struct Catalog {
-    builders: HashMap<ImplTypeId, Rc<dyn Builder>>,
+    builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
     bindings: MultiMap<IfaceTypeId, Binding>,
 }
 
@@ -94,14 +95,14 @@ impl Catalog {
         Impl: 'static + Send + Sync,
         Bld: TypedBuilder<Impl> + 'static,
     {
-        let builder = Rc::new(builder);
+        let builder = Arc::new(builder);
         self.builders
             .insert(ImplTypeId(TypeId::of::<Impl>()), builder.clone());
 
         self.bindings.insert(
             IfaceTypeId(TypeId::of::<Impl>()),
             Binding::new(
-                Box::new(TypeCaster::<Impl> {
+                Arc::new(TypeCaster::<Impl> {
                     // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the `Impl` instances
                     cast_arc: |v| v.downcast().unwrap(),
                 }),
@@ -112,7 +113,7 @@ impl Catalog {
 
     pub fn add_factory<Fct, Impl>(&mut self, factory: Fct)
     where
-        Fct: 'static + Fn() -> Impl,
+        Fct: 'static + Fn() -> Impl + Send + Sync,
         Impl: 'static + Send + Sync,
     {
         self.add_builder(Factory::new(factory))
@@ -142,7 +143,7 @@ impl Catalog {
         self.bindings.insert(
             iface_type,
             Binding::new(
-                Box::new(TypeCaster::<Iface> {
+                Arc::new(TypeCaster::<Iface> {
                     cast_arc: |v| {
                         // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the `Impl` instances
                         let s: Arc<Impl> = v.downcast().unwrap();
@@ -186,13 +187,14 @@ pub fn builder_for<B: BuilderLike>() -> B::Builder {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 struct Binding {
-    caster: Box<AnyTypeCaster>,
-    builder: Rc<dyn Builder>,
+    caster: Arc<AnyTypeCaster>,
+    builder: Arc<dyn Builder>,
 }
 
 impl Binding {
-    fn new(caster: Box<AnyTypeCaster>, builder: Rc<dyn Builder>) -> Self {
+    fn new(caster: Arc<AnyTypeCaster>, builder: Arc<dyn Builder>) -> Self {
         Self { caster, builder }
     }
 }

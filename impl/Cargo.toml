@@ -1,6 +1,6 @@
 [package]
 name = "dill-impl"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2018"
 description = "Implementation details of the dill DI library."
 repository = "https://github.com/sergiimk/dill-rs"

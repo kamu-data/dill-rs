@@ -1,6 +1,6 @@
 [package]
 name = "dill"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2018"
 description = "Runtime depenency injection library."
 keywords = ["di", "dependency", "injection"]
@@ -15,6 +15,6 @@ authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-dill-impl = { path = "impl", version = "0.1.0" }
+dill-impl = { path = "impl", version = "0.2.0" }
 thiserror = "^1"
 multimap = "~0.8.3"
