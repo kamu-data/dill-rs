@@ -11,11 +11,6 @@
   </p>
 </div>
 
-# Examples
-
-Basic dependency resolution:
-
-
 # TODO
 - Replace `add_*` with generic `add<B: Into<Builder>>`
 - value by reference in new()

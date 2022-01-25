@@ -290,32 +290,3 @@ fn test_self_injection() {
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::bimpl::c");
 }
-
-#[test]
-fn boobobo() {
-    #[component]
-    struct A {
-        b: B,
-    }
-
-    impl A {
-        fn foo(&self) -> String {
-            format!("a::{}", self.b.bar())
-        }
-    }
-
-    #[component]
-    #[derive(Clone)]
-    struct B;
-
-    impl B {
-        fn bar(&self) -> String {
-            format!("b")
-        }
-    }
-
-    let catalog = CatalogBuilder::new().add::<A>().add::<B>().build();
-
-    let a = catalog.get_one::<A>().unwrap();
-    assert_eq!(a.foo(), "a::b");
-}
