@@ -5,6 +5,7 @@ use std::{
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+/// Controls the lifetime of an instance created by [`Builders`][`crate::Builder`]
 pub trait Scope {
     fn get(&self) -> Option<Arc<dyn Any + Send + Sync>>;
     fn set(&self, inst: Arc<dyn Any + Send + Sync>);
@@ -14,6 +15,7 @@ pub trait Scope {
 // Transient
 /////////////////////////////////////////////////////////////////////////////////////////
 
+/// Never caches so that every dependency resolution will result in a new instance.
 pub struct Transient;
 
 impl Transient {
@@ -34,6 +36,7 @@ impl Scope for Transient {
 // Singleton
 /////////////////////////////////////////////////////////////////////////////////////////
 
+/// Caches an instance upon first creation for the entire duration of the program.
 pub struct Singleton {
     instance: Mutex<Option<Arc<dyn Any + Send + Sync>>>,
 }

@@ -6,6 +6,7 @@ use crate::{Catalog, InjectionError};
 // DependencySpec
 /////////////////////////////////////////////////////////////////////////////////////////
 
+/// Specifies a particular way of resolving a dependency using the [`Catalog`]
 pub trait DependencySpec {
     type ReturnType;
     fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError>;
@@ -15,6 +16,8 @@ pub trait DependencySpec {
 // OneOf
 /////////////////////////////////////////////////////////////////////////////////////////
 
+/// Builds a single instance of type implementing specific interface. Will return an error
+/// if no implementations or multiple implementations were found.
 pub struct OneOf<Iface>
 where
     Iface: 'static + ?Sized + Send + Sync,
@@ -28,11 +31,11 @@ where
 {
     type ReturnType = Arc<Iface>;
 
-    fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError> {
+    default fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError> {
         let mut builders = cat.builders_for::<Iface>();
         if let Some(first) = builders.next() {
             if builders.next().is_some() {
-                Err(InjectionError::Ambiguous)
+                Err(InjectionError::ambiguous::<Iface>())
             } else {
                 first.get(cat)
             }
@@ -42,10 +45,17 @@ where
     }
 }
 
+impl DependencySpec for OneOf<Catalog> {
+    fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError> {
+        Ok(Arc::new(cat.clone()))
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // AllOf
 /////////////////////////////////////////////////////////////////////////////////////////
 
+/// Builds all instances that implement a specific interface, returning a [`Vec`].
 pub struct AllOf<Iface>
 where
     Iface: 'static + ?Sized,

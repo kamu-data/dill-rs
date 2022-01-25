@@ -11,8 +11,9 @@ fn test_send_to_thread() {
         }
     }
 
-    let mut cat = Catalog::new();
+    let mut cat = CatalogBuilder::new();
     cat.add::<AImpl>();
+    let cat = cat.build();
 
     let res = std::thread::spawn(move || {
         let a = cat.get_one::<AImpl>().unwrap();
@@ -35,8 +36,9 @@ fn test_clone_to_threads() {
         }
     }
 
-    let mut cat = Catalog::new();
+    let mut cat = CatalogBuilder::new();
     cat.add::<AImpl>();
+    let cat = cat.build();
 
     let (res1, res2) = {
         let cat_t1 = cat.clone();

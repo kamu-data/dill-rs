@@ -1,12 +1,14 @@
 #![feature(assert_matches)]
 
+use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use dill::*;
 
 #[test]
 fn test_one_of_unregistered() {
-    let cat = Catalog::new();
+    let cat = CatalogBuilder::new().build();
+
     let res = cat.get::<OneOf<i32>>();
     assert_matches!(res, Err(e) if e == InjectionError::unregistered::<i32>());
 }
@@ -22,8 +24,10 @@ fn test_one_of_same_type() {
         }
     }
 
-    let mut cat = Catalog::new();
+    let mut cat = CatalogBuilder::new();
     cat.add::<X>();
+    let cat = cat.build();
+
     let inst = cat.get::<OneOf<X>>().unwrap();
     assert_eq!(inst.test(), "hello");
 }
@@ -43,9 +47,11 @@ fn test_one_of_by_interface() {
         }
     }
 
-    let mut cat = Catalog::new();
-    cat.add::<AImpl>();
-    cat.bind::<dyn A, AImpl>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .build();
+
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl");
 }
@@ -75,10 +81,12 @@ fn test_one_of_by_multiple_interfaces() {
         }
     }
 
-    let mut cat = Catalog::new();
-    cat.add::<ABImpl>();
-    cat.bind::<dyn A, ABImpl>().unwrap();
-    cat.bind::<dyn B, ABImpl>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add::<ABImpl>()
+        .bind::<dyn A, ABImpl>()
+        .bind::<dyn B, ABImpl>()
+        .build();
+
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.foo(), "abimpl");
     let inst = cat.get::<OneOf<dyn B>>().unwrap();
@@ -115,13 +123,12 @@ fn test_one_of_with_dependency() {
         }
     }
 
-    let mut cat = Catalog::new();
-
-    cat.add::<AImpl>();
-    cat.bind::<dyn A, AImpl>().unwrap();
-
-    cat.add::<BImpl>();
-    cat.bind::<dyn B, BImpl>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .add::<BImpl>()
+        .bind::<dyn B, BImpl>()
+        .build();
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::bimpl");
@@ -148,10 +155,10 @@ fn test_one_of_with_dependency_missing() {
         fn test(&self) -> String;
     }
 
-    let mut cat = Catalog::new();
-
-    cat.add::<AImpl>();
-    cat.bind::<dyn A, AImpl>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .build();
 
     let res = cat.get::<OneOf<dyn A>>();
     assert_matches!(res.err(), Some(e) if e == InjectionError::unregistered::<dyn B>());
@@ -181,11 +188,12 @@ fn test_all_of() {
         }
     }
 
-    let mut cat = Catalog::new();
-    cat.add::<AImpl1>();
-    cat.add::<AImpl2>();
-    cat.bind::<dyn A, AImpl1>().unwrap();
-    cat.bind::<dyn A, AImpl2>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add::<AImpl1>()
+        .add::<AImpl2>()
+        .bind::<dyn A, AImpl1>()
+        .bind::<dyn A, AImpl2>()
+        .build();
 
     let instances = cat.get::<AllOf<dyn A>>().unwrap();
     let mut vals: Vec<_> = instances.iter().map(|i| i.test()).collect();
@@ -196,8 +204,9 @@ fn test_all_of() {
 
 #[test]
 fn test_add_value() {
-    let mut cat = Catalog::new();
+    let mut cat = CatalogBuilder::new();
     cat.add_value("foo".to_owned());
+    let cat = cat.build();
 
     let val = cat.get_one::<String>().unwrap();
     assert_eq!(val.as_ref(), "foo");
@@ -205,9 +214,108 @@ fn test_add_value() {
 
 #[test]
 fn test_add_factory() {
-    let mut cat = Catalog::new();
+    let mut cat = CatalogBuilder::new();
     cat.add_factory(|| "foo".to_owned());
+    let cat = cat.build();
 
     let val = cat.get_one::<String>().unwrap();
     assert_eq!(val.as_ref(), "foo");
+}
+
+#[test]
+fn test_self_injection() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    struct AImpl1 {
+        b: Arc<dyn B>,
+    }
+
+    #[component]
+    impl AImpl1 {
+        fn new(catalog: &Catalog) -> Self {
+            Self {
+                b: catalog.get_one().unwrap(),
+            }
+        }
+    }
+
+    impl A for AImpl1 {
+        fn test(&self) -> String {
+            format!("aimpl::{}", self.b.test())
+        }
+    }
+
+    trait B: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    struct BImpl {
+        c: Arc<C>,
+    }
+
+    #[component]
+    impl BImpl {
+        fn new(catalog: Catalog) -> Self {
+            Self {
+                c: catalog.get_one().unwrap(),
+            }
+        }
+    }
+
+    impl B for BImpl {
+        fn test(&self) -> String {
+            format!("bimpl::{}", self.c.test())
+        }
+    }
+
+    #[component]
+    struct C;
+
+    impl C {
+        fn test(&self) -> String {
+            "c".to_owned()
+        }
+    }
+
+    let cat = CatalogBuilder::new()
+        .add::<AImpl1>()
+        .bind::<dyn A, AImpl1>()
+        .add::<BImpl>()
+        .bind::<dyn B, BImpl>()
+        .add::<C>()
+        .build();
+
+    let inst = cat.get::<OneOf<dyn A>>().unwrap();
+    assert_eq!(inst.test(), "aimpl::bimpl::c");
+}
+
+#[test]
+fn boobobo() {
+    #[component]
+    struct A {
+        b: B,
+    }
+
+    impl A {
+        fn foo(&self) -> String {
+            format!("a::{}", self.b.bar())
+        }
+    }
+
+    #[component]
+    #[derive(Clone)]
+    struct B;
+
+    impl B {
+        fn bar(&self) -> String {
+            format!("b")
+        }
+    }
+
+    let catalog = CatalogBuilder::new().add::<A>().add::<B>().build();
+
+    let a = catalog.get_one::<A>().unwrap();
+    assert_eq!(a.foo(), "a::b");
 }

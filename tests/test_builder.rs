@@ -17,9 +17,10 @@ fn test_type_info() {
         }
     }
 
-    let mut cat = Catalog::new();
-    cat.add::<AImpl>();
-    cat.bind::<dyn A, AImpl>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .build();
 
     let builders: Vec<_> = cat.builders_for::<dyn A>().collect();
     assert_eq!(builders.len(), 1);
@@ -50,23 +51,27 @@ fn test_with_args_by_value() {
         }
     }
 
-    let mut cat = Catalog::new();
-    cat.add_builder(
-        builder_for::<AImpl>()
-            .with_host("foo".to_owned())
-            .with_port(8080),
-    );
-    cat.bind::<dyn A, AImpl>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add_builder(
+            builder_for::<AImpl>()
+                .with_host("foo".to_owned())
+                .with_port(8080),
+        )
+        .bind::<dyn A, AImpl>()
+        .build();
+
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::foo::8080");
 
-    let mut cat = Catalog::new();
-    cat.add_builder(
-        builder_for::<AImpl>()
-            .with_host_fn(|_| Ok("bar".to_owned()))
-            .with_port_fn(|_| Ok(8080)),
-    );
-    cat.bind::<dyn A, AImpl>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add_builder(
+            builder_for::<AImpl>()
+                .with_host_fn(|_| Ok("bar".to_owned()))
+                .with_port_fn(|_| Ok(8080)),
+        )
+        .bind::<dyn A, AImpl>()
+        .build();
+
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::bar::8080");
 }
@@ -109,17 +114,21 @@ fn test_with_args_by_ref() {
         }
     }
 
-    let mut cat = Catalog::new();
-    cat.add_builder(builder_for::<AImpl>().with_b(Arc::new(BImpl1)));
-    cat.bind::<dyn A, AImpl>().unwrap();
-    cat.add::<BImpl2>();
-    cat.bind::<dyn B, BImpl2>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add_builder(builder_for::<AImpl>().with_b(Arc::new(BImpl1)))
+        .bind::<dyn A, AImpl>()
+        .add::<BImpl2>()
+        .bind::<dyn B, BImpl2>()
+        .build();
+
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::bimpl1");
 
-    let mut cat = Catalog::new();
-    cat.add_builder(builder_for::<AImpl>().with_b_fn(|_| Ok(Arc::new(BImpl1))));
-    cat.bind::<dyn A, AImpl>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add_builder(builder_for::<AImpl>().with_b_fn(|_| Ok(Arc::new(BImpl1))))
+        .bind::<dyn A, AImpl>()
+        .build();
+
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::bimpl1");
 }
@@ -164,11 +173,13 @@ fn test_new_ctor() {
         }
     }
 
-    let mut cat = Catalog::new();
-    cat.add::<AImpl>();
-    cat.bind::<dyn A, AImpl>().unwrap();
-    cat.add::<BImpl>();
-    cat.bind::<dyn B, BImpl>().unwrap();
+    let cat = CatalogBuilder::new()
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .add::<BImpl>()
+        .bind::<dyn B, BImpl>()
+        .build();
+
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::bimpl::foo");
 }
@@ -199,10 +210,12 @@ fn test_new_ctor_cloned() {
     #[derive(Clone)]
     struct B(String);
 
-    let mut cat = Catalog::new();
-    cat.add::<AImpl>();
-    cat.bind::<dyn A, AImpl>().unwrap();
-    cat.add_value(B("foo".to_owned()));
+    let cat = CatalogBuilder::new()
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .add_value(B("foo".to_owned()))
+        .build();
+
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::foo");
 }
@@ -232,10 +245,12 @@ fn test_new_ctor_by_ref() {
 
     struct B(String);
 
-    let mut cat = Catalog::new();
-    cat.add::<AImpl>();
-    cat.bind::<dyn A, AImpl>().unwrap();
-    cat.add_value(B("foo".to_owned()));
+    let cat = CatalogBuilder::new()
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .add_value(B("foo".to_owned()))
+        .build();
+
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::foo");
 }

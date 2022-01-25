@@ -134,8 +134,8 @@ fn implement_builder(
     let gen = quote! {
         impl ::dill::BuilderLike for #impl_type {
             type Builder = #builder_name;
-            fn register(cat: &mut ::dill::Catalog) {
-                cat.add_builder(#builder_name::new())
+            fn register(cat: &mut ::dill::CatalogBuilder) {
+                cat.add_builder(Self::builder());
             }
             fn builder() -> Self::Builder {
                 #builder_name::new()

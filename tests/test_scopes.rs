@@ -19,10 +19,11 @@ fn test_transient() {
         }
     }
 
-    let mut cat = Catalog::new();
-    cat.add::<AImpl>();
-    cat.bind::<dyn A, AImpl>().unwrap();
-    cat.add_value("foo".to_owned());
+    let cat = CatalogBuilder::new()
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .add_value("foo".to_owned())
+        .build();
 
     let inst1 = cat.get::<OneOf<dyn A>>().unwrap();
     let inst2 = cat.get::<OneOf<dyn A>>().unwrap();
@@ -55,10 +56,11 @@ fn test_singleton() {
         }
     }
 
-    let mut cat = Catalog::new();
-    cat.add::<AImpl>();
-    cat.bind::<dyn A, AImpl>().unwrap();
-    cat.add_value("foo".to_owned());
+    let cat = CatalogBuilder::new()
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .add_value("foo".to_owned())
+        .build();
 
     let inst1 = cat.get::<OneOf<dyn A>>().unwrap();
     let inst2 = cat.get::<OneOf<dyn A>>().unwrap();
