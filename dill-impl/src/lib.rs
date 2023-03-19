@@ -1,15 +1,8 @@
 extern crate proc_macro;
 
-use darling::FromMeta;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn;
-
-#[derive(FromMeta, Debug)]
-struct ComponentOptions {
-    #[darling(default)]
-    _scope: Option<syn::Path>,
-}
 
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -297,27 +290,27 @@ fn implement_arg(
 
 /// Searches for `#[scope(X)]` attribute and returns `X`
 fn get_scope(attrs: &Vec<syn::Attribute>) -> Option<syn::Path> {
-    attrs
-        .iter()
-        .filter_map(|a| a.parse_meta().ok())
-        .filter_map(|m| match m {
-            syn::Meta::List(ml) => Some(ml),
-            _ => None,
-        })
-        .filter(|ml| ml.path.is_ident("scope"))
-        .next()
-        .and_then(|ml| match ml.nested.into_iter().next() {
-            Some(syn::NestedMeta::Meta(syn::Meta::Path(p))) => Some(p),
-            _ => panic!("Invalid scope attribute"),
-        })
+    let mut scope = None;
+
+    for attr in attrs {
+        if attr.path().is_ident("scope") {
+            attr.parse_nested_meta(|meta| {
+                scope = Some(meta.path);
+                Ok(())
+            })
+            .unwrap();
+        }
+    }
+
+    scope
 }
 
 /// Searches `impl` block for `new()` method
-fn get_new(impl_items: &Vec<syn::ImplItem>) -> Option<&syn::ImplItemMethod> {
+fn get_new(impl_items: &Vec<syn::ImplItem>) -> Option<&syn::ImplItemFn> {
     impl_items
         .iter()
         .filter_map(|i| match i {
-            syn::ImplItem::Method(m) => Some(m),
+            syn::ImplItem::Fn(m) => Some(m),
             _ => None,
         })
         .filter(|m| m.sig.ident == "new")
