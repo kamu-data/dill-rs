@@ -1,20 +1,6 @@
-[package]
-name = "dill"
-version = "0.3.0"
-edition = "2021"
-description = "Runtime depenency injection library."
-keywords = ["di", "dependency", "injection"]
-categories = [
-    "config",
-    "development-tools",
+[workspace]
+resolver = "2"
+members = [
+    "dill-impl",
+    "dill",
 ]
-readme = "README.md"
-documentation = "https://docs.rs/dill"
-repository = "https://github.com/sergiimk/dill-rs"
-authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-license = "MIT OR Apache-2.0"
-
-[dependencies]
-dill-impl = { path = "impl", version = "0.3.0" }
-thiserror = "^1"
-multimap = "~0.8.3"

@@ -254,3 +254,81 @@ fn test_new_ctor_by_ref() {
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::foo");
 }
+
+/*#[test]
+fn test_generic_type_from_struct() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    #[component]
+    struct AImpl<T> {
+        t: T,
+    }
+
+    impl<T> A for AImpl<T>
+    where
+        T: Send + Sync,
+        T: Display,
+    {
+        fn test(&self) -> String {
+            format!("aimpl::{}", self.t)
+        }
+    }
+
+    struct B(String);
+
+    impl Display for B {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    let cat = CatalogBuilder::new()
+        .add::<AImpl<B>>()
+        .bind::<dyn A, AImpl<B>>()
+        .add_value(B("foo".to_owned()))
+        .build();
+
+    let inst = cat.get::<OneOf<dyn A>>().unwrap();
+    assert_eq!(inst.test(), "aimpl::foo");
+}*/
+
+/*#[test]
+fn test_generic_type_from_impl() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    struct AImpl<T> {
+        b: String,
+        _p: PhantomData<T>,
+    }
+
+    #[component]
+    impl<T> AImpl<T> {
+        pub fn new(bee: &B) -> Self {
+            Self {
+                b: bee.0.clone(),
+                _p: PhantomData,
+            }
+        }
+    }
+
+    impl<T> A for AImpl<T> {
+        fn test(&self) -> String {
+            format!("aimpl::{}::{}", self.b, std::any::type_name::<T>())
+        }
+    }
+
+    struct B(String);
+
+    let cat = CatalogBuilder::new()
+        .add::<AImpl<u8>>()
+        .bind::<dyn A, AImpl<u8>>()
+        .add_value(B("foo".to_owned()))
+        .build();
+
+    let inst = cat.get::<OneOf<dyn A>>().unwrap();
+    assert_eq!(inst.test(), "aimpl::foo::u8");
+}*/

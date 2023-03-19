@@ -8,7 +8,7 @@ use syn;
 #[derive(FromMeta, Debug)]
 struct ComponentOptions {
     #[darling(default)]
-    scope: Option<syn::Path>,
+    _scope: Option<syn::Path>,
 }
 
 #[proc_macro_attribute]
@@ -30,6 +30,7 @@ pub fn scope(_args: TokenStream, item: TokenStream) -> TokenStream {
 fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
     let impl_name = &ast.ident;
     let impl_type = syn::parse2(quote! { #impl_name }).unwrap();
+    let impl_generics = syn::parse2(quote! {}).unwrap();
 
     let args: Vec<_> = ast
         .fields
@@ -41,13 +42,21 @@ fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
         get_scope(&ast.attrs).unwrap_or_else(|| syn::parse_str("::dill::Transient").unwrap());
 
     let mut gen: TokenStream = quote! { #ast }.into();
-    let builder: TokenStream = implement_builder(&ast.vis, &impl_type, scope_type, args, false);
+    let builder: TokenStream = implement_builder(
+        &ast.vis,
+        &impl_type,
+        &impl_generics,
+        scope_type,
+        args,
+        false,
+    );
 
     gen.extend(builder.into_iter());
     gen
 }
 
 fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream {
+    let impl_generics = &ast.generics;
     let impl_type = &ast.self_ty;
     let new = get_new(&ast.items).expect(
         "When using #[component] macro on the impl block it's expected to contain a new() function. \
@@ -77,7 +86,8 @@ fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream 
         get_scope(&ast.attrs).unwrap_or_else(|| syn::parse_str("::dill::Transient").unwrap());
 
     let mut gen: TokenStream = quote! { #ast }.into();
-    let builder: TokenStream = implement_builder(&vis, impl_type, scope_type, args, true);
+    let builder: TokenStream =
+        implement_builder(&vis, impl_type, impl_generics, scope_type, args, true);
 
     gen.extend(builder.into_iter());
     gen
@@ -86,6 +96,7 @@ fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream 
 fn implement_builder(
     impl_vis: &syn::Visibility,
     impl_type: &syn::Type,
+    _impl_generics: &syn::Generics,
     scope_type: syn::Path,
     args: Vec<(syn::Ident, syn::Type)>,
     has_new: bool,

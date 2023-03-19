@@ -5,13 +5,69 @@
   </p>
   <p>
 
-[![Crates.io](https://img.shields.io/crates/v/dill.svg)](https://crates.io/crates/dill)
-[![build](https://github.com/sergiimk/dill-rs/actions/workflows/build.yaml/badge.svg)](https://github.com/sergiimk/dill-rs/actions/workflows/build.yaml)
+[![Crates.io](https://img.shields.io/crates/v/dill.svg?style=for-the-badge)](https://crates.io/crates/dill)
+[![CI](https://img.shields.io/github/actions/workflow/status/sergiimk/dill-rs/build.yaml?logo=githubactions&label=CI&logoColor=white&style=for-the-badge&branch=master)](https://github.com/sergiimk/dill-rs/actions)
+[![Dependencies](https://deps.rs/repo/github/sergiimk/dill-rs/status.svg?&style=for-the-badge)](https://deps.rs/repo/github/sergiimk/dill-rs)
 
   </p>
 </div>
 
+# Example
+
+```rust
+/////////////////////////////////////////
+
+// Define interfaces in traits
+trait A: Send + Sync {
+    fn test(&self) -> String;
+}
+
+// Implement traits to define components
+#[component]
+struct AImpl {
+    // Auto-inject dependencies (also supports by-value)
+    b: Arc<dyn B>,
+}
+
+impl A for AImpl {
+    fn test(&self) -> String {
+        format!("aimpl::{}", self.b.test())
+    }
+}
+
+/////////////////////////////////////////
+
+trait B: Send + Sync {
+    fn test(&self) -> String;
+}
+
+#[component]
+struct BImpl;
+
+impl B for BImpl {
+    fn test(&self) -> String {
+        "bimpl".to_owned()
+    }
+}
+
+/////////////////////////////////////////
+
+// Register interfaces and bind them to implementations
+let cat = CatalogBuilder::new()
+    .add::<AImpl>()
+    .bind::<dyn A, AImpl>()
+    .add::<BImpl>()
+    .bind::<dyn B, BImpl>()
+    .build();
+
+// Get objects and have their deps satisfied automatically
+let inst = cat.get::<OneOf<dyn A>>().unwrap();
+assert_eq!(inst.test(), "aimpl::bimpl");
+```
+
 # TODO
+- Add `trybuild` tests (see https://youtu.be/geovSK3wMB8?t=956)
+- Support generic types
 - Replace `add_*` with generic `add<B: Into<Builder>>`
 - value by reference in new()
 - + Send + Sync plague  https://www.reddit.com/r/rust/comments/6dz0xh/abstracting_over_reference_counted_types_rc_and/
