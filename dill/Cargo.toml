@@ -8,7 +8,7 @@ categories = [
     "config",
     "development-tools",
 ]
-readme = "README.md"
+readme = "../README.md"
 documentation = "https://docs.rs/dill"
 repository = "https://github.com/sergiimk/dill-rs"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
