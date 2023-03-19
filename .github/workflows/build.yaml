@@ -1,12 +1,12 @@
 name: build
-on: [push]
-#on:
-#  push:
-#    branches:
-#      - master
-#  pull_request:
-#    branches:
-#      - master
+on:
+  push:
+    paths-ignore:
+      - "**.md"
+  # manual trigger
+  workflow_dispatch: {}
+env:
+  RUST_BACKTRACE: "1"
 jobs:
   test_linux:
     name: Test / Linux
@@ -14,6 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+        with:
+          components: rustfmt
       - run: cargo build
       - run: cargo fmt --check
       - run: cargo test --verbose
