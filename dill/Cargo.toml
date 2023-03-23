@@ -17,4 +17,4 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 dill-impl = { path = "../dill-impl", version = "0.5.0" }
 thiserror = "1"
-multimap = "0.8"
+multimap = "0.9"
