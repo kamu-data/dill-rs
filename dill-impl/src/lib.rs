@@ -173,27 +173,27 @@ fn implement_builder(
 
         impl ::dill::Builder for #builder_name {
             fn instance_type_id(&self) -> std::any::TypeId {
-                std::any::TypeId::of::<#impl_type>()
+                ::std::any::TypeId::of::<#impl_type>()
             }
 
             fn instance_type_name(&self) -> &'static str {
-                std::any::type_name::<#impl_type>()
+                ::std::any::type_name::<#impl_type>()
             }
 
-            fn get(&self, cat: &::dill::Catalog) -> Result<std::sync::Arc<dyn std::any::Any + Send + Sync>, ::dill::InjectionError> {
+            fn get(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<dyn ::std::any::Any + Send + Sync>, ::dill::InjectionError> {
                 Ok(::dill::TypedBuilder::get(self, cat)?)
             }
         }
 
         impl ::dill::TypedBuilder<#impl_type> for #builder_name {
             fn get(&self, cat: &::dill::Catalog) -> Result<std::sync::Arc<#impl_type>, ::dill::InjectionError> {
-                use dill::Scope;
+                use ::dill::Scope;
 
                 if let Some(inst) = self.scope.get() {
                     return Ok(inst.downcast().unwrap());
                 }
 
-                let inst = std::sync::Arc::new(self.build(cat)?);
+                let inst = ::std::sync::Arc::new(self.build(cat)?);
 
                 self.scope.set(inst.clone());
                 Ok(inst)
@@ -254,12 +254,12 @@ fn implement_arg(
 
     let from_catalog = if is_reference(typ) {
         let stripped = strip_reference(typ);
-        quote! { cat.get::<OneOf<#stripped>>()? }
+        quote! { cat.get::<::dill::OneOf<#stripped>>()? }
     } else if is_smart_ptr(typ) {
         let stripped = strip_smart_ptr(typ);
-        quote! { cat.get::<OneOf<#stripped>>()? }
+        quote! { cat.get::<::dill::OneOf<#stripped>>()? }
     } else {
-        quote! { cat.get::<OneOf<#typ>>().map(|v| v.as_ref().clone())? }
+        quote! { cat.get::<::dill::OneOf<#typ>>().map(|v| v.as_ref().clone())? }
     };
 
     let prepare_dependency = if is_reference(typ) {

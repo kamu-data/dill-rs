@@ -76,6 +76,7 @@ assert_eq!(inst.test(), "aimpl::bimpl");
   - thread
   - task
   - catalog?
+- optional / default dependencies
 - thread safety
 - adding values to catalog dynamically
 - lazy values
