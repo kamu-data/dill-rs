@@ -1,8 +1,11 @@
 extern crate proc_macro;
 
+mod types;
+
 use proc_macro::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote};
 use syn;
+use types::InjectionType;
 
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -235,76 +238,90 @@ fn implement_arg(
 ) {
     let override_fn_name = format_ident!("arg_{}_fn", name);
 
-    let override_fn_field = if is_reference(typ) {
-        proc_macro2::TokenStream::new()
-    } else {
-        quote! {
+    let injection_type = types::deduce_injection_type(typ);
+
+    let override_fn_field = match &injection_type {
+        InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
+        _ => quote! {
             #override_fn_name: Option<Box<dyn Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + Send + Sync>>,
+        },
+    };
+
+    let override_fn_field_ctor = match &injection_type {
+        InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
+        _ => quote! { #override_fn_name: None, },
+    };
+
+    let override_setters = match &injection_type {
+        InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
+        _ => {
+            let setter_val_name = format_ident!("with_{}", name);
+            let setter_fn_name = format_ident!("with_{}_fn", name);
+            quote! {
+                pub fn #setter_val_name(mut self, val: #typ) -> #builder {
+                    self.#override_fn_name = Some(Box::new(move |_| Ok(val.clone())));
+                    self
+                }
+
+                pub fn #setter_fn_name(
+                    mut self,
+                    fun: impl Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + 'static + Send + Sync
+                ) -> #builder {
+                    self.#override_fn_name = Some(Box::new(fun));
+                    self
+                }
+            }
         }
     };
 
-    let override_fn_field_ctor = if is_reference(typ) {
-        proc_macro2::TokenStream::new()
-    } else {
-        quote! { #override_fn_name: None, }
+    // TODO: Make these rules recursice
+    let check_dependency = match &injection_type {
+        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
+        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
+        InjectionType::Option { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::check(cat) }
+            }
+            _ => unimplemented!("Currently only Option<Arc<Iface>> is supported"),
+        },
+        InjectionType::Vec { item } => match item.as_ref() {
+            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::check(cat) },
+            _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
+        },
+        InjectionType::Value { typ } => quote! { ::dill::OneOf::<#typ>::check(cat) },
     };
 
-    let override_setters = if is_reference(typ) {
-        proc_macro2::TokenStream::new()
-    } else {
-        let setter_val_name = format_ident!("with_{}", name);
-        let setter_fn_name = format_ident!("with_{}_fn", name);
-        quote! {
-            pub fn #setter_val_name(mut self, val: #typ) -> #builder {
-                self.#override_fn_name = Some(Box::new(move |_| Ok(val.clone())));
-                self
+    let from_catalog = match &injection_type {
+        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::get(cat)? },
+        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::get(cat)? },
+        InjectionType::Option { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::get(cat)? }
             }
-
-            pub fn #setter_fn_name(
-                mut self,
-                fun: impl Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + 'static + Send + Sync
-            ) -> #builder {
-                self.#override_fn_name = Some(Box::new(fun));
-                self
-            }
+            _ => unimplemented!("Currently only Option<Arc<Iface>> is supported"),
+        },
+        InjectionType::Vec { item } => match item.as_ref() {
+            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::get(cat)? },
+            _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
+        },
+        InjectionType::Value { typ } => {
+            quote! { ::dill::OneOf::<#typ>::get(cat).map(|v| v.as_ref().clone())? }
         }
     };
 
-    let check_dependency = if is_reference(typ) {
-        let stripped = strip_reference(typ);
-        quote! { ::dill::OneOf::<#stripped>::check(cat) }
-    } else if is_smart_ptr(typ) {
-        let stripped = strip_smart_ptr(typ);
-        quote! { ::dill::OneOf::<#stripped>::check(cat) }
-    } else {
-        quote! { ::dill::OneOf::<#typ>::check(cat) }
-    };
-
-    let from_catalog = if is_reference(typ) {
-        let stripped = strip_reference(typ);
-        quote! { ::dill::OneOf::<#stripped>::get(cat)? }
-    } else if is_smart_ptr(typ) {
-        let stripped = strip_smart_ptr(typ);
-        quote! { ::dill::OneOf::<#stripped>::get(cat)? }
-    } else {
-        quote! { ::dill::OneOf::<#typ>::get(cat).map(|v| v.as_ref().clone())? }
-    };
-
-    let prepare_dependency = if is_reference(typ) {
-        quote! { let #name = #from_catalog; }
-    } else {
-        quote! {
+    let prepare_dependency = match &injection_type {
+        InjectionType::Reference { .. } => quote! { let #name = #from_catalog; },
+        _ => quote! {
             let #name = match self.#override_fn_name {
                 Some(ref fun) => fun(cat)?,
                 _ => #from_catalog,
             };
-        }
+        },
     };
 
-    let provide_dependency = if is_reference(typ) {
-        quote! { #name.as_ref() }
-    } else {
-        quote! { #name }
+    let provide_dependency = match &injection_type {
+        InjectionType::Reference { .. } => quote! { #name.as_ref() },
+        _ => quote! { #name },
     };
 
     (
@@ -357,47 +374,4 @@ fn get_new(impl_items: &Vec<syn::ImplItem>) -> Option<&syn::ImplItemFn> {
         })
         .filter(|m| m.sig.ident == "new")
         .next()
-}
-
-fn is_reference(typ: &syn::Type) -> bool {
-    match typ {
-        syn::Type::Reference(_) => true,
-        _ => false,
-    }
-}
-
-fn strip_reference(typ: &syn::Type) -> syn::Type {
-    match typ {
-        syn::Type::Reference(r) => r.elem.as_ref().clone(),
-        _ => typ.clone(),
-    }
-}
-
-fn is_smart_ptr(typ: &syn::Type) -> bool {
-    match typ {
-        syn::Type::Path(typepath) if typepath.qself.is_none() => {
-            match typepath.path.segments.first() {
-                Some(seg) if seg.ident.to_string() == "Arc" => true,
-                _ => false,
-            }
-        }
-        _ => false,
-    }
-}
-
-fn strip_smart_ptr(typ: &syn::Type) -> syn::Type {
-    match typ {
-        syn::Type::Path(typepath) if typepath.qself.is_none() => {
-            match typepath.path.segments.first() {
-                Some(seg) if seg.ident.to_string() == "Arc" => match seg.arguments {
-                    syn::PathArguments::AngleBracketed(ref args) => {
-                        syn::parse2(args.args.to_token_stream()).unwrap()
-                    }
-                    _ => typ.clone(),
-                },
-                _ => typ.clone(),
-            }
-        }
-        _ => typ.clone(),
-    }
 }

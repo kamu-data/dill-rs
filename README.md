@@ -73,14 +73,17 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - Injection specs:
   - `OneOf` - expects a single implementation of a given interface
   - `AllOf` - returns a collection of all implementations on a given interface
+  - `Maybe<Spec>` - Returns `None` if inner `Spec` cannot be resolved
 - Component scopes:
   - `Transient` (default) - a new instance is created for every invocation
   - `Singleton` - an instance is created upon first use and then reused for the rest of calls
 - `#[component]` macro can derive `Builder`:
-  - When used directly for a `struct`
-  - When used on `impl` block to use `Impl::new()` function
+  - When used directly for a `struct` or on `impl` block with `Impl::new()` function
+  - Can inject as `Arc<T>`, `T: Clone`, `&T`
+  - `Option<T>` is interpreted as `OneOf<T>` spec
+  - `Vec<T>` is interpreted as `AllOf<T>` spec
+  - Supports custom argument bindings in `Builder`
 - Prebuilt / add by value support
-- Argument bindings support in `Builder`
 - By value injection of `Clone` types
 - `Catalog` can be self-injected
 
@@ -101,10 +104,12 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - Put **implementation in control**
   - The type implementor (and not type user) usually has the best knowledge of what the optimal lifecycle for the type should be and its and concurrency characteristics, thus implementors should be in control of the defaults
 
+
 # TODO
+- Support builders providing own interface lists (default bindings)
 - Improve graph validation
-- Optional / default dependencies
 - Make Catalog cloning cheap
+- Consider using traits to map `Arc`, `Option`, `Vec` to dependency specs instead of relying on macro magic
 - Add `trybuild` tests (see https://youtu.be/geovSK3wMB8?t=956)
 - Support generic types
 - Replace `add_*` with generic `add<B: Into<Builder>>`

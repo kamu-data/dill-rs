@@ -96,3 +96,32 @@ where
         Ok(())
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Maybe
+/////////////////////////////////////////////////////////////////////////////////////////
+
+/// Returns `None` if an optional dependency is not registered
+pub struct Maybe<Inner: DependencySpec> {
+    _dummy: PhantomData<Inner>,
+}
+
+impl<Inner: DependencySpec> DependencySpec for Maybe<Inner> {
+    type ReturnType = Option<Inner::ReturnType>;
+
+    fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError> {
+        match Inner::get(cat) {
+            Ok(v) => Ok(Some(v)),
+            Err(InjectionError::Unregistered(_)) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+
+    fn check(cat: &Catalog) -> Result<(), InjectionError> {
+        match Inner::check(cat) {
+            Ok(()) => Ok(()),
+            Err(InjectionError::Unregistered(_)) => Ok(()),
+            Err(err) => Err(err),
+        }
+    }
+}
