@@ -12,6 +12,9 @@
   </p>
 </div>
 
+This crate is still in early stages and needs a lot of work, BUT it's [in active use in `kamu-cli`](https://github.com/kamu-data/kamu-cli/blob/601572a00702d15f630738b5fcad50ecafaed816/kamu-cli/src/app.rs#L89-L146) - a fairly large project organized according to [Onion/Clean Architecture](https://herbertograca.com/2017/11/16/explicit-architecture-01-ddd-hexagonal-onion-clean-cqrs-how-i-put-it-all-together/). We are continuing to improve this crate as we go and encounter more sophisticated DI scenarios.
+
+
 # Example
 
 ```rust
@@ -65,7 +68,42 @@ let inst = cat.get::<OneOf<dyn A>>().unwrap();
 assert_eq!(inst.test(), "aimpl::bimpl");
 ```
 
+
+# Features
+- Injection specs:
+  - `OneOf` - expects a single implementation of a given interface
+  - `AllOf` - returns a collection of all implementations on a given interface
+- Component scopes:
+  - `Transient` (default) - a new instance is created for every invocation
+  - `Singleton` - an instance is created upon first use and then reused for the rest of calls
+- `#[component]` macro can derive `Builder`:
+  - When used directly for a `struct`
+  - When used on `impl` block to use `Impl::new()` function
+- Prebuilt / add by value support
+- Argument bindings support in `Builder`
+- By value injection of `Clone` types
+- `Catalog` can be self-injected
+
+
+# Design Principles
+- **Non-intrusive**
+  - Writing DI-friendly code should be as close as possible to writing regular types
+  - DI should be an additive feature - we should be able to disable it and have all code compile (i.e. allowing for DI-optional libraries)
+- **Externalizable**
+  - It should be possible to add DI capabilities to 3rd party code
+- Focus on **runtime** injection
+  - Leveraging type system and zero-cost abstractions is great, but hard to get right - this project started because we needed something practical fast
+  - Some cases involve dynamic registration of objects (e.g. adding an auth token during HTTP request processing), which further complicates compile-time DI
+  - We use DI to integrate coarse-grained components, where some overhead is tolerable
+  - We compensate for safety by providing runtime graph validation
+- Focus on **constructor injection**
+  - Field/property/accessor-based injection would complicate the system, and our experience there is little use for anything fancier that ctor injection
+
+
 # TODO
+- Make Catalog cloning cheap
+- Qualified `#[dill::scope(dill::Singleton)]` silently does nothing
+- Graph validation
 - Add `trybuild` tests (see https://youtu.be/geovSK3wMB8?t=956)
 - Support generic types
 - Replace `add_*` with generic `add<B: Into<Builder>>`
@@ -89,36 +127,4 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - proc macro error handling
 - build a type without registering
 
-# Done
-- multiple implementations per interface
-- implementation-controlled sharing and lifetime
-- dependency specs
-  - OneOf
-  - AllOf
-- scopes
-  - transient
-  - singleton
-- auto builders
-  - support scope in derivation
-- support prebuilt / add by value
-- support Impl::new()
-- argument bindings
-- by value injection of `Clone` types
-- Separate catalog use from catalog building
-- Make Catalog cloning cheap
-- Catalog self-injection
 
-
-# Principles
-- Nothing framework-specific
-
-
-
-- Create instance (ctor, new(), and external types)
-- Provide dynamic dependencies -> recurse
-- Provide fixed dependencies (Fn multi)
-- Get existing instance if exists (scope)
-
-
-- Separate builder from the scope, catalog, Arc stuff
-- Pass build context instead of catalog (e.g. for stack tracking)

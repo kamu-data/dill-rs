@@ -3,7 +3,7 @@ name = "dill"
 version = "0.5.1"
 edition = "2021"
 description = "Runtime depenency injection library."
-keywords = ["di", "dependency", "injection"]
+keywords = ["di", "ioc", "dependency-injection", "dependency-inversion"]
 categories = [
     "config",
     "development-tools",
