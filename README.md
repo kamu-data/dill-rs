@@ -106,6 +106,7 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 
 
 # TODO
+- Support `stable` rust
 - Support builders providing own interface lists (default bindings)
 - Improve graph validation
 - Make Catalog cloning cheap

@@ -7,7 +7,7 @@ members = [
 
 
 [workspace.package]
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 readme = "README.md"
 homepage = "https://github.com/sergiimk/dill-rs"
@@ -24,4 +24,4 @@ include = [
 
 
 [workspace.dependencies]
-dill-impl = { path = "dill-impl", version = "0.5.2" }
+dill-impl = { path = "dill-impl", version = "0.5.3" }

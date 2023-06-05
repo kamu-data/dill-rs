@@ -6,9 +6,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum InjectionError {
-    #[error("Unregistered type")]
+    #[error(transparent)]
     Unregistered(UnregisteredTypeError),
-    #[error("Ambiguous type")]
+    #[error(transparent)]
     Ambiguous(AmbiguousTypeError),
 }
 
@@ -63,5 +63,29 @@ impl std::fmt::Display for ValidationError {
             writeln!(f, "{}: {}", i, err)?;
         }
         Ok(())
+    }
+}
+
+pub trait ValidationErrorExt {
+    fn ignore<T: 'static + ?Sized>(self) -> Self;
+}
+
+impl ValidationErrorExt for Result<(), ValidationError> {
+    fn ignore<T: 'static + ?Sized>(self) -> Self {
+        let type_id = TypeId::of::<T>();
+        let Err(mut err) = self else {
+            return Ok(())
+        };
+
+        err.errors.retain(|e| match e {
+            InjectionError::Unregistered(e) => e.type_id != type_id,
+            InjectionError::Ambiguous(e) => e.type_id != type_id,
+        });
+
+        if err.errors.len() == 0 {
+            Ok(())
+        } else {
+            Err(err)
+        }
     }
 }

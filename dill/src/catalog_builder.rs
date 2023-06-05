@@ -122,15 +122,33 @@ impl CatalogBuilder {
         Catalog::new(builders, bindings)
     }
 
-    // TODO: Should return a validation report type that will track
-    // - Unresolved dependencies
-    // - Ambiguous dependencies
-    // - Missing dependenies with defaults
-    // - AllOf that don't resolve to anything
-    //
-    // Users will then be able to specify whether to treat them as errors / warnings
-    // or have them ignored.
+    /// Validates the dependency graph returning a combined error.
+    ///
+    /// In case some of your types are registered dynamically you can
+    /// [ValidationErrorExt::ignore()] method which is implemented on the
+    /// Result type (you need to import the trait).
+    ///
+    /// Example:
+    /// ```
+    /// use dill::*;
+    /// trait MyDynamicType {}
+    ///
+    /// let mut b = CatalogBuilder::new();
+    /// // Populate the builder
+    /// b.validate()
+    ///  .ignore::<dyn MyDynamicType>()
+    ///  .unwrap();
+    /// ```
     pub fn validate(&mut self) -> Result<(), ValidationError> {
+        // TODO: Should return a validation report type that will track
+        // - Unresolved dependencies
+        // - Ambiguous dependencies
+        // - Missing dependenies with defaults
+        // - AllOf that don't resolve to anything
+        //
+        // Users will then be able to specify whether to treat them as errors / warnings
+        // or have them ignored.
+
         let mut errors = Vec::new();
 
         // TODO: Avoid allocations when constructing a temporary catalog
@@ -140,6 +158,16 @@ impl CatalogBuilder {
                 errors.append(&mut err.errors);
             }
         }
+
+        // Sort and deduplicate by type
+        errors.sort_by_key(|e| match e {
+            InjectionError::Unregistered(err) => err.type_id,
+            InjectionError::Ambiguous(err) => err.type_id,
+        });
+        errors.dedup_by_key(|e| match e {
+            InjectionError::Unregistered(err) => err.type_id,
+            InjectionError::Ambiguous(err) => err.type_id,
+        });
 
         // Return builder to its original state
         let mut cat = Arc::into_inner(cat.0).unwrap();

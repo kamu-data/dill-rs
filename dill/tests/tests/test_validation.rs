@@ -49,6 +49,10 @@ fn test_validate_static_graph() {
         if u.type_name == "dyn unit::tests::test_validation::test_validate_static_graph::B"
     );
 
+    // Consider B is registered dynamically
+    let res = b.validate().ignore::<dyn B>();
+    assert_matches!(res, Ok(()));
+
     // Success
     b.add::<BImpl>();
     b.bind::<dyn B, BImpl>();
