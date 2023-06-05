@@ -1,9 +1,7 @@
-use std::{
-    any::{type_name, TypeId},
-    collections::HashMap,
-    marker::Unsize,
-    sync::Arc,
-};
+use std::any::{type_name, TypeId};
+use std::collections::HashMap;
+use std::marker::Unsize;
+use std::sync::Arc;
 
 use multimap::MultiMap;
 
@@ -17,6 +15,8 @@ pub struct CatalogBuilder {
     builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
     bindings: MultiMap<IfaceTypeId, Binding>,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 impl CatalogBuilder {
     pub fn new() -> Self {
@@ -51,7 +51,8 @@ impl CatalogBuilder {
             IfaceTypeId(TypeId::of::<Impl>()),
             Binding::new(
                 Arc::new(TypeCaster::<Impl> {
-                    // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the `Impl` instances
+                    // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the `Impl`
+                    // instances
                     cast_arc: |v| v.downcast().unwrap(),
                 }),
                 builder,
@@ -99,7 +100,8 @@ impl CatalogBuilder {
             Binding::new(
                 Arc::new(TypeCaster::<Iface> {
                     cast_arc: |v| {
-                        // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the `Impl` instances
+                        // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the
+                        // `Impl` instances
                         let s: Arc<Impl> = v.downcast().unwrap();
                         let t: Arc<Iface> = s;
                         t
@@ -118,5 +120,36 @@ impl CatalogBuilder {
         std::mem::swap(&mut self.builders, &mut builders);
         std::mem::swap(&mut self.bindings, &mut bindings);
         Catalog::new(builders, bindings)
+    }
+
+    // TODO: Should return a validation report type that will track
+    // - Unresolved dependencies
+    // - Ambiguous dependencies
+    // - Missing dependenies with defaults
+    // - AllOf that don't resolve to anything
+    //
+    // Users will then be able to specify whether to treat them as errors / warnings
+    // or have them ignored.
+    pub fn validate(&mut self) -> Result<(), ValidationError> {
+        let mut errors = Vec::new();
+
+        // TODO: Avoid allocations when constructing a temporary catalog
+        let cat = self.build();
+        for builder in cat.builders() {
+            if let Err(mut err) = builder.check(&cat) {
+                errors.append(&mut err.errors);
+            }
+        }
+
+        // Return builder to its original state
+        let mut cat = Arc::into_inner(cat.0).unwrap();
+        std::mem::swap(&mut self.builders, &mut cat.builders);
+        std::mem::swap(&mut self.bindings, &mut cat.bindings);
+
+        if errors.len() != 0 {
+            Err(ValidationError { errors })
+        } else {
+            Ok(())
+        }
     }
 }

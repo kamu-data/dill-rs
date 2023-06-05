@@ -52,8 +52,8 @@ fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream 
     let impl_generics = &ast.generics;
     let impl_type = &ast.self_ty;
     let new = get_new(&ast.items).expect(
-        "When using #[component] macro on the impl block it's expected to contain a new() function. \
-        Otherwise use #[derive(Builder)] on the struct."
+        "When using #[component] macro on the impl block it's expected to contain a new() \
+         function. Otherwise use #[derive(Builder)] on the struct.",
     );
 
     let args: Vec<_> = new
@@ -97,30 +97,30 @@ fn implement_builder(
     let builder_name = format_ident!("{}Builder", quote! { #impl_type }.to_string());
 
     let arg_name: Vec<_> = args.iter().map(|(name, _)| name).collect();
-    let arg_impls: Vec<_> = args
-        .iter()
-        .map(|(name, typ)| implement_arg(name, typ, &builder_name))
-        .collect();
 
-    // Unzip
     let mut arg_override_fn_field = Vec::new();
     let mut arg_override_fn_field_ctor = Vec::new();
     let mut arg_override_setters = Vec::new();
     let mut arg_prepare_dependency = Vec::new();
     let mut arg_provide_dependency = Vec::new();
-    for (
-        override_fn_field,
-        override_fn_field_ctor,
-        override_setters,
-        prepare_dependency,
-        provide_dependency,
-    ) in arg_impls
-    {
+    let mut arg_check_dependency = Vec::new();
+
+    for (name, typ) in &args {
+        let (
+            override_fn_field,
+            override_fn_field_ctor,
+            override_setters,
+            prepare_dependency,
+            provide_dependency,
+            check_dependency,
+        ) = implement_arg(name, typ, &builder_name);
+
         arg_override_fn_field.push(override_fn_field);
         arg_override_fn_field_ctor.push(override_fn_field_ctor);
         arg_override_setters.push(override_setters);
         arg_prepare_dependency.push(prepare_dependency);
         arg_provide_dependency.push(provide_dependency);
+        arg_check_dependency.push(check_dependency);
     }
 
     let ctor = if !has_new {
@@ -166,6 +166,7 @@ fn implement_builder(
             #( #arg_override_setters )*
 
             fn build(&self, cat: &::dill::Catalog) -> Result<#impl_type, ::dill::InjectionError> {
+                use ::dill::DependencySpec;
                 #( #arg_prepare_dependency )*
                 Ok(#ctor)
             }
@@ -182,6 +183,22 @@ fn implement_builder(
 
             fn get(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<dyn ::std::any::Any + Send + Sync>, ::dill::InjectionError> {
                 Ok(::dill::TypedBuilder::get(self, cat)?)
+            }
+
+            fn check(&self, cat: &::dill::Catalog) -> Result<(), ::dill::ValidationError> {
+                use ::dill::DependencySpec;
+
+                let mut errors = Vec::new();
+                #(
+                if let Err(err) = #arg_check_dependency {
+                    errors.push(err);
+                }
+                )*
+                if errors.len() != 0 {
+                    Err(::dill::ValidationError { errors })
+                } else {
+                    Ok(())
+                }
             }
         }
 
@@ -209,11 +226,12 @@ fn implement_arg(
     typ: &syn::Type,
     builder: &syn::Ident,
 ) -> (
-    proc_macro2::TokenStream,
-    proc_macro2::TokenStream,
-    proc_macro2::TokenStream,
-    proc_macro2::TokenStream,
-    proc_macro2::TokenStream,
+    proc_macro2::TokenStream, // override_fn_field
+    proc_macro2::TokenStream, // override_fn_field_ctor
+    proc_macro2::TokenStream, // override_setters
+    proc_macro2::TokenStream, // prepare_dependency
+    proc_macro2::TokenStream, // provide_dependency
+    proc_macro2::TokenStream, // check_dependency
 ) {
     let override_fn_name = format_ident!("arg_{}_fn", name);
 
@@ -252,14 +270,24 @@ fn implement_arg(
         }
     };
 
-    let from_catalog = if is_reference(typ) {
+    let check_dependency = if is_reference(typ) {
         let stripped = strip_reference(typ);
-        quote! { cat.get::<::dill::OneOf<#stripped>>()? }
+        quote! { ::dill::OneOf::<#stripped>::check(cat) }
     } else if is_smart_ptr(typ) {
         let stripped = strip_smart_ptr(typ);
-        quote! { cat.get::<::dill::OneOf<#stripped>>()? }
+        quote! { ::dill::OneOf::<#stripped>::check(cat) }
     } else {
-        quote! { cat.get::<::dill::OneOf<#typ>>().map(|v| v.as_ref().clone())? }
+        quote! { ::dill::OneOf::<#typ>::check(cat) }
+    };
+
+    let from_catalog = if is_reference(typ) {
+        let stripped = strip_reference(typ);
+        quote! { ::dill::OneOf::<#stripped>::get(cat)? }
+    } else if is_smart_ptr(typ) {
+        let stripped = strip_smart_ptr(typ);
+        quote! { ::dill::OneOf::<#stripped>::get(cat)? }
+    } else {
+        quote! { ::dill::OneOf::<#typ>::get(cat).map(|v| v.as_ref().clone())? }
     };
 
     let prepare_dependency = if is_reference(typ) {
@@ -285,6 +313,7 @@ fn implement_arg(
         override_setters,
         prepare_dependency,
         provide_dependency,
+        check_dependency,
     )
 }
 

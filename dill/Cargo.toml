@@ -1,20 +1,18 @@
 [package]
 name = "dill"
-version = "0.5.1"
-edition = "2021"
 description = "Runtime depenency injection library."
-keywords = ["di", "ioc", "dependency-injection", "dependency-inversion"]
-categories = [
-    "config",
-    "development-tools",
-]
-readme = "../README.md"
-documentation = "https://docs.rs/dill"
-repository = "https://github.com/sergiimk/dill-rs"
-authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-license = "MIT OR Apache-2.0"
+categories = ["config", "development-tools"]
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-dill-impl = { path = "../dill-impl", version = "0.5.1" }
+dill-impl = { workspace = true }
 thiserror = "1"
 multimap = "0.9"

@@ -2,6 +2,8 @@ use std::any::{type_name, TypeId};
 
 use thiserror::Error;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum InjectionError {
     #[error("Unregistered type")]
@@ -9,6 +11,8 @@ pub enum InjectionError {
     #[error("Ambiguous type")]
     Ambiguous(AmbiguousTypeError),
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 impl InjectionError {
     pub fn unregistered<Iface: 'static + ?Sized>() -> Self {
@@ -18,6 +22,7 @@ impl InjectionError {
         })
     }
 
+    // TODO: Should contain information about which implementations were found
     pub fn ambiguous<Iface: 'static + ?Sized>() -> Self {
         Self::Ambiguous(AmbiguousTypeError {
             type_id: TypeId::of::<Iface>(),
@@ -26,16 +31,37 @@ impl InjectionError {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 #[error("Unregistered type: ${type_name}")]
 pub struct UnregisteredTypeError {
-    type_id: TypeId,
-    type_name: &'static str,
+    pub type_id: TypeId,
+    pub type_name: &'static str,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 #[error("Ambiguous type: ${type_name}")]
 pub struct AmbiguousTypeError {
-    type_id: TypeId,
-    type_name: &'static str,
+    pub type_id: TypeId,
+    pub type_name: &'static str,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug, Clone, PartialEq, Eq)]
+pub struct ValidationError {
+    pub errors: Vec<InjectionError>,
+}
+
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "DI graph validation failed:")?;
+        for (i, err) in self.errors.iter().enumerate() {
+            writeln!(f, "{}: {}", i, err)?;
+        }
+        Ok(())
+    }
 }

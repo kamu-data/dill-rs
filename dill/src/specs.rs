@@ -1,4 +1,5 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use crate::{Catalog, InjectionError};
 
@@ -9,15 +10,19 @@ use crate::{Catalog, InjectionError};
 /// Specifies a particular way of resolving a dependency using the [`Catalog`]
 pub trait DependencySpec {
     type ReturnType;
+    // Resolve and create instances
     fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError>;
+    // Only resolve builders without instantiating and report errors
+    fn check(cat: &Catalog) -> Result<(), InjectionError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // OneOf
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Builds a single instance of type implementing specific interface. Will return an error
-/// if no implementations or multiple implementations were found.
+/// Builds a single instance of type implementing specific interface. Will
+/// return an error if no implementations or multiple implementations were
+/// found.
 pub struct OneOf<Iface>
 where
     Iface: 'static + ?Sized + Send + Sync,
@@ -43,6 +48,19 @@ where
             Err(InjectionError::unregistered::<Iface>())
         }
     }
+
+    default fn check(cat: &Catalog) -> Result<(), InjectionError> {
+        let mut builders = cat.builders_for::<Iface>();
+        if let Some(_) = builders.next() {
+            if builders.next().is_some() {
+                Err(InjectionError::ambiguous::<Iface>())
+            } else {
+                Ok(())
+            }
+        } else {
+            Err(InjectionError::unregistered::<Iface>())
+        }
+    }
 }
 
 impl DependencySpec for OneOf<Catalog> {
@@ -55,7 +73,8 @@ impl DependencySpec for OneOf<Catalog> {
 // AllOf
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Builds all instances that implement a specific interface, returning a [`Vec`].
+/// Builds all instances that implement a specific interface, returning a
+/// [`Vec`].
 pub struct AllOf<Iface>
 where
     Iface: 'static + ?Sized,
@@ -71,5 +90,9 @@ where
 
     fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError> {
         cat.builders_for::<Iface>().map(|b| b.get(cat)).collect()
+    }
+
+    fn check(_cat: &Catalog) -> Result<(), InjectionError> {
+        Ok(())
     }
 }

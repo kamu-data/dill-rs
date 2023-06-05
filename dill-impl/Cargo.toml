@@ -1,11 +1,15 @@
 [package]
 name = "dill-impl"
-version = "0.5.1"
-edition = "2018"
 description = "Implementation details of the dill DI library."
-repository = "https://github.com/sergiimk/dill-rs"
-authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-license = "MIT OR Apache-2.0"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
 
 [lib]
 proc-macro = true

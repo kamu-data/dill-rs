@@ -1,4 +1,6 @@
-use std::{any::TypeId, collections::HashMap, sync::Arc};
+use std::any::TypeId;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use multimap::MultiMap;
 
@@ -15,12 +17,12 @@ pub(crate) struct ImplTypeId(pub TypeId);
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
-pub struct Catalog(Arc<CatalogInner>);
+pub struct Catalog(pub(crate) Arc<CatalogInner>);
 
 #[derive(Clone)]
-struct CatalogInner {
-    builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
-    bindings: MultiMap<IfaceTypeId, Binding>,
+pub(crate) struct CatalogInner {
+    pub(crate) builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
+    pub(crate) bindings: MultiMap<IfaceTypeId, Binding>,
 }
 
 impl Catalog {
@@ -40,7 +42,6 @@ impl Catalog {
         Iface: 'static + ?Sized,
     {
         let iface_type = IfaceTypeId(TypeId::of::<Iface>());
-
         let bindings = self.0.bindings.get_vec(&&iface_type);
         TypecastBuilderIterator::new(bindings)
     }

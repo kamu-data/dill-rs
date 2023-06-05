@@ -102,15 +102,16 @@ assert_eq!(inst.test(), "aimpl::bimpl");
   - The type implementor (and not type user) usually has the best knowledge of what the optimal lifecycle for the type should be and its and concurrency characteristics, thus implementors should be in control of the defaults
 
 # TODO
-- Graph validation
-- optional / default dependencies
+- Improve graph validation
+- Optional / default dependencies
 - Make Catalog cloning cheap
 - Add `trybuild` tests (see https://youtu.be/geovSK3wMB8?t=956)
 - Support generic types
 - Replace `add_*` with generic `add<B: Into<Builder>>`
 - value by reference in new()
 - + Send + Sync plague  https://www.reddit.com/r/rust/comments/6dz0xh/abstracting_over_reference_counted_types_rc_and/
-- scopes
+- Add low-overhead resolution stack to errors (e.g. populated on unwind)
+- Extra scopes
   - invocation
   - thread
   - task

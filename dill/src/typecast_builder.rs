@@ -1,8 +1,6 @@
-use std::{
-    any::{Any, TypeId},
-    marker::PhantomData,
-    sync::Arc,
-};
+use std::any::{Any, TypeId};
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use crate::*;
 
@@ -45,6 +43,10 @@ where
 
     fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         self.builder.get(cat)
+    }
+
+    fn check(&self, cat: &Catalog) -> Result<(), ValidationError> {
+        self.builder.check(cat)
     }
 }
 
@@ -95,7 +97,8 @@ impl<'a, Iface: 'static + ?Sized> Iterator for TypecastBuilderIterator<'a, Iface
             let prev_pos = self.pos;
             self.pos += 1;
             bindings.get(prev_pos).map(|b| {
-                // SAFETY: the TypeID key of the `bindings` map is guaranteed to match the `Iface` type
+                // SAFETY: the TypeID key of the `bindings` map is guaranteed to match the
+                // `Iface` type
                 let caster: &TypeCaster<Iface> = b.caster.downcast_ref().unwrap();
                 TypecastBuilder::new(b.builder.as_ref(), caster)
             })

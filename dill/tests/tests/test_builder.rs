@@ -29,7 +29,7 @@ fn test_type_info() {
     assert_eq!(builder.instance_type_id(), TypeId::of::<AImpl>());
     assert_eq!(
         builder.instance_type_name(),
-        "test_builder::test_type_info::AImpl"
+        "unit::tests::test_builder::test_type_info::AImpl"
     );
 }
 
