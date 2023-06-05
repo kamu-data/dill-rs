@@ -97,13 +97,14 @@ assert_eq!(inst.test(), "aimpl::bimpl");
   - We use DI to integrate coarse-grained components, where some overhead is tolerable
   - We compensate for safety by providing runtime graph validation
 - Focus on **constructor injection**
-  - Field/property/accessor-based injection would complicate the system, and our experience there is little use for anything fancier that ctor injection
-
+  - Field/property/accessor-based injection would complicate the system, and in our experience is of little use
+- Put **implementation in control**
+  - The type implementor (and not type user) usually has the best knowledge of what the optimal lifecycle for the type should be and its and concurrency characteristics, thus implementors should be in control of the defaults
 
 # TODO
-- Make Catalog cloning cheap
-- Qualified `#[dill::scope(dill::Singleton)]` silently does nothing
 - Graph validation
+- optional / default dependencies
+- Make Catalog cloning cheap
 - Add `trybuild` tests (see https://youtu.be/geovSK3wMB8?t=956)
 - Support generic types
 - Replace `add_*` with generic `add<B: Into<Builder>>`
@@ -114,7 +115,6 @@ assert_eq!(inst.test(), "aimpl::bimpl");
   - thread
   - task
   - catalog?
-- optional / default dependencies
 - thread safety
 - adding values to catalog dynamically
 - lazy values

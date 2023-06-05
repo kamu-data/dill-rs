@@ -293,7 +293,7 @@ fn get_scope(attrs: &Vec<syn::Attribute>) -> Option<syn::Path> {
     let mut scope = None;
 
     for attr in attrs {
-        if attr.path().is_ident("scope") {
+        if is_dill_attr(attr, "scope") {
             attr.parse_nested_meta(|meta| {
                 scope = Some(meta.path);
                 Ok(())
@@ -303,6 +303,19 @@ fn get_scope(attrs: &Vec<syn::Attribute>) -> Option<syn::Path> {
     }
 
     scope
+}
+
+fn is_dill_attr<I: ?Sized>(attr: &syn::Attribute, ident: &I) -> bool
+where
+    syn::Ident: PartialEq<I>,
+{
+    if attr.path().is_ident(ident) {
+        true
+    } else if attr.path().segments.len() == 2 && &attr.path().segments[0].ident == "dill" {
+        true
+    } else {
+        false
+    }
 }
 
 /// Searches `impl` block for `new()` method

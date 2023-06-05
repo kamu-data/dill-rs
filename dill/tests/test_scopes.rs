@@ -1,7 +1,7 @@
-use dill::*;
-
 #[test]
 fn test_transient() {
+    use dill::*;
+
     trait A: Send + Sync {
         fn test(&self) -> String;
     }
@@ -43,8 +43,8 @@ fn test_singleton() {
         fn test(&self) -> String;
     }
 
-    #[component]
-    #[scope(Singleton)]
+    #[dill::component]
+    #[dill::scope(dill::Singleton)]
     struct AImpl {
         // Needed for compiler not to optimize type out
         name: String,
@@ -56,14 +56,14 @@ fn test_singleton() {
         }
     }
 
-    let cat = CatalogBuilder::new()
+    let cat = dill::CatalogBuilder::new()
         .add::<AImpl>()
         .bind::<dyn A, AImpl>()
         .add_value("foo".to_owned())
         .build();
 
-    let inst1 = cat.get::<OneOf<dyn A>>().unwrap();
-    let inst2 = cat.get::<OneOf<dyn A>>().unwrap();
+    let inst1 = cat.get::<dill::OneOf<dyn A>>().unwrap();
+    let inst2 = cat.get::<dill::OneOf<dyn A>>().unwrap();
 
     assert_eq!(
         inst1.as_ref() as *const dyn A,
