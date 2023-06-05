@@ -9,7 +9,8 @@
 //!
 //! ## Basic dependency resolution
 //!
-//! As a user of type `A` we only care about getting an instance to use - the life-cycle of `A` and its dependencies remain hidden from us.
+//! As a user of type `A` we only care about getting an instance to use - the
+//! life-cycle of `A` and its dependencies remain hidden from us.
 //!
 //! ```
 //! use dill::*;
@@ -46,8 +47,10 @@
 //!
 //! ## Using trait objects (aka Interfaces)
 //!
-//! Every type can be associated with multiple traits that it implements using [`CatalogBuilder::bind()`] method, allowing dynamically
-//! picking best implementation to use (e.g. based on config) or even using multiple implementations at once (e.g. plugins).
+//! Every type can be associated with multiple traits that it implements using
+//! [`CatalogBuilder::bind()`] method, allowing dynamically picking best
+//! implementation to use (e.g. based on config) or even using multiple
+//! implementations at once (e.g. plugins).
 //!
 //! ```
 //! use dill::*;
@@ -92,8 +95,9 @@
 //!
 //! ## Controlling lifetimes with Scopes
 //!
-//! The life-cycle of a type is no longer controlled by the user of a type. Author of type `A` below can choose
-//! whether `A` should be created per call ([`Transient`]) or reused by all clients ([`Singleton`]).
+//! The life-cycle of a type is no longer controlled by the user of a type.
+//! Author of type `A` below can choose whether `A` should be created per call
+//! ([`Transient`]) or reused by all clients ([`Singleton`]).
 //!
 //! ```
 //! use dill::*;
@@ -128,7 +132,8 @@
 //!
 //! ## Parametrizing builders
 //!
-//! Builders can be parametrized during the registration process for convenience (e.g. with values read from configuration).
+//! Builders can be parametrized during the registration process for convenience
+//! (e.g. with values read from configuration).
 //!
 //! ```
 //! use dill::*;

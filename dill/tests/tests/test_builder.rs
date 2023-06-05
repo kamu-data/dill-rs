@@ -1,4 +1,5 @@
-use std::{any::TypeId, sync::Arc};
+use std::any::TypeId;
+use std::sync::Arc;
 
 use dill::*;
 

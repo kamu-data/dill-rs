@@ -19,9 +19,13 @@ pub(crate) fn deduce_injection_type(typ: &syn::Type) -> InjectionType {
             inner: strip_smart_ptr(typ),
         }
     } else if is_option(typ) {
-        InjectionType::Option { element: Box::new(deduce_injection_type(&get_option_element_type(typ))) }
+        InjectionType::Option {
+            element: Box::new(deduce_injection_type(&get_option_element_type(typ))),
+        }
     } else if is_vec(typ) {
-        InjectionType::Vec { item: Box::new(deduce_injection_type(&get_vec_item_type(typ))) }
+        InjectionType::Vec {
+            item: Box::new(deduce_injection_type(&get_vec_item_type(typ))),
+        }
     } else {
         InjectionType::Value { typ: typ.clone() }
     }
@@ -42,7 +46,7 @@ pub(crate) fn strip_reference(typ: &syn::Type) -> syn::Type {
 }
 
 pub(crate) fn is_smart_ptr(typ: &syn::Type) -> bool {
-    let syn::Type::Path(typepath) = typ else { 
+    let syn::Type::Path(typepath) = typ else {
         return false
     };
 
@@ -71,7 +75,7 @@ pub(crate) fn strip_smart_ptr(typ: &syn::Type) -> syn::Type {
 }
 
 pub(crate) fn is_option(typ: &syn::Type) -> bool {
-    let syn::Type::Path(typepath) = typ else { 
+    let syn::Type::Path(typepath) = typ else {
         return false
     };
 
@@ -83,10 +87,10 @@ pub(crate) fn is_option(typ: &syn::Type) -> bool {
 }
 
 pub(crate) fn get_option_element_type(typ: &syn::Type) -> syn::Type {
-    let syn::Type::Path(typepath) = typ else { 
-        panic!("Type is not an Option") 
+    let syn::Type::Path(typepath) = typ else {
+        panic!("Type is not an Option")
     };
-    
+
     assert!(typepath.qself.is_none());
     assert_eq!(typepath.path.segments.len(), 1);
     assert_eq!(&typepath.path.segments[0].ident, "Option");
@@ -97,9 +101,8 @@ pub(crate) fn get_option_element_type(typ: &syn::Type) -> syn::Type {
     syn::parse2(args.args.to_token_stream()).unwrap()
 }
 
-
 pub(crate) fn is_vec(typ: &syn::Type) -> bool {
-    let syn::Type::Path(typepath) = typ else { 
+    let syn::Type::Path(typepath) = typ else {
         return false
     };
 
@@ -111,10 +114,10 @@ pub(crate) fn is_vec(typ: &syn::Type) -> bool {
 }
 
 pub(crate) fn get_vec_item_type(typ: &syn::Type) -> syn::Type {
-    let syn::Type::Path(typepath) = typ else { 
-        panic!("Type is not a Vec") 
+    let syn::Type::Path(typepath) = typ else {
+        panic!("Type is not a Vec")
     };
-    
+
     assert!(typepath.qself.is_none());
     assert_eq!(typepath.path.segments.len(), 1);
     assert_eq!(&typepath.path.segments[0].ident, "Vec");
