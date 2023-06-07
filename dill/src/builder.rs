@@ -1,5 +1,5 @@
 use std::any::{Any, TypeId};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::*;
 
@@ -57,83 +57,10 @@ pub fn builder_for<B: BuilderLike>() -> B::Builder {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct Prebuilt<T>
+/// Arc<T> can infinitely produce clones of itself and therefore is a builder
+impl<Impl> Builder for Arc<Impl>
 where
-    T: 'static + Send + Sync,
-{
-    value: Arc<T>,
-}
-
-impl<T> Prebuilt<T>
-where
-    T: 'static + Send + Sync,
-{
-    pub fn from_value(value: T) -> Self {
-        Self {
-            value: Arc::new(value),
-        }
-    }
-
-    pub fn from_shared(value: Arc<T>) -> Self {
-        Self { value }
-    }
-}
-
-impl<T> Builder for Prebuilt<T>
-where
-    T: 'static + Send + Sync,
-{
-    fn instance_type_id(&self) -> TypeId {
-        TypeId::of::<T>()
-    }
-
-    fn instance_type_name(&self) -> &'static str {
-        std::any::type_name::<T>()
-    }
-
-    fn get(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
-        Ok(self.value.clone())
-    }
-
-    fn check(&self, _cat: &Catalog) -> Result<(), ValidationError> {
-        Ok(())
-    }
-}
-
-impl<T> TypedBuilder<T> for Prebuilt<T>
-where
-    T: 'static + Send + Sync,
-{
-    fn get(&self, _cat: &Catalog) -> Result<Arc<T>, InjectionError> {
-        Ok(self.value.clone())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: Implement Builder trait for any `Fn() -> T` without wrapping?
-pub struct Factory<Fct, Impl>
-where
-    Fct: Fn() -> Impl,
-    Impl: 'static + Send + Sync,
-{
-    factory: Fct,
-}
-
-impl<Fct, Impl> Factory<Fct, Impl>
-where
-    Fct: Fn() -> Impl,
-    Impl: 'static + Send + Sync,
-{
-    pub fn new(factory: Fct) -> Self {
-        Self { factory }
-    }
-}
-
-impl<Fct, Impl> Builder for Factory<Fct, Impl>
-where
-    Fct: Fn() -> Impl + Send + Sync,
-    Impl: 'static + Send + Sync,
+    Impl: Send + Sync + 'static,
 {
     fn instance_type_id(&self) -> TypeId {
         TypeId::of::<Impl>()
@@ -144,7 +71,7 @@ where
     }
 
     fn get(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
-        Ok(Arc::new((self.factory)()))
+        Ok(self.clone())
     }
 
     fn check(&self, _cat: &Catalog) -> Result<(), ValidationError> {
@@ -152,12 +79,116 @@ where
     }
 }
 
-impl<Fct, Impl> TypedBuilder<Impl> for Factory<Fct, Impl>
+impl<Impl> TypedBuilder<Impl> for Arc<Impl>
 where
-    Fct: Fn() -> Impl + Send + Sync,
+    Impl: Send + Sync + 'static,
+{
+    fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
+        Ok(self.clone())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+/// Fn() -> Arc<T> acts as a builder
+impl<Fct, Impl> Builder for Fct
+where
+    Fct: Fn() -> Arc<Impl> + Send + Sync,
+    Impl: Send + Sync + 'static,
+{
+    fn instance_type_id(&self) -> TypeId {
+        TypeId::of::<Impl>()
+    }
+
+    fn instance_type_name(&self) -> &'static str {
+        std::any::type_name::<Impl>()
+    }
+
+    fn get(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+        Ok(self())
+    }
+
+    fn check(&self, _cat: &Catalog) -> Result<(), ValidationError> {
+        Ok(())
+    }
+}
+
+impl<Fct, Impl> TypedBuilder<Impl> for Fct
+where
+    Fct: Fn() -> Arc<Impl> + Send + Sync,
+    Impl: Send + Sync + 'static,
+{
+    fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
+        Ok(self())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) struct Lazy<Fct, Impl>
+where
+    Fct: FnOnce() -> Impl,
+    Impl: 'static + Send + Sync,
+{
+    state: Mutex<LazyState<Fct, Impl>>,
+}
+
+struct LazyState<Fct, Impl> {
+    factory: Option<Fct>,
+    instance: Option<Arc<Impl>>,
+}
+
+impl<Fct, Impl> Lazy<Fct, Impl>
+where
+    Fct: FnOnce() -> Impl,
+    Impl: 'static + Send + Sync,
+{
+    pub fn new(factory: Fct) -> Self {
+        Self {
+            state: Mutex::new(LazyState {
+                factory: Some(factory),
+                instance: None,
+            }),
+        }
+    }
+}
+
+impl<Fct, Impl> Builder for Lazy<Fct, Impl>
+where
+    Fct: FnOnce() -> Impl + Send + Sync,
+    Impl: 'static + Send + Sync,
+{
+    fn instance_type_id(&self) -> TypeId {
+        TypeId::of::<Impl>()
+    }
+
+    fn instance_type_name(&self) -> &'static str {
+        std::any::type_name::<Impl>()
+    }
+
+    fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+        Ok(TypedBuilder::get(self, cat)?)
+    }
+
+    fn check(&self, _cat: &Catalog) -> Result<(), ValidationError> {
+        Ok(())
+    }
+}
+
+impl<Fct, Impl> TypedBuilder<Impl> for Lazy<Fct, Impl>
+where
+    Fct: FnOnce() -> Impl + Send + Sync,
     Impl: 'static + Send + Sync,
 {
     fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
-        Ok(Arc::new((self.factory)()))
+        let mut s = self.state.lock().unwrap();
+        if let Some(inst) = s.instance.as_ref() {
+            Ok(inst.clone())
+        } else {
+            let factory = s.factory.take().unwrap();
+            let inst = Arc::new(factory());
+            s.instance = Some(inst.clone());
+            Ok(inst)
+        }
     }
 }

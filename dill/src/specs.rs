@@ -65,6 +65,7 @@ where
 
 impl DependencySpec for OneOf<Catalog> {
     fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError> {
+        // TODO: Avoid wrapping in Arc?
         Ok(Arc::new(cat.clone()))
     }
 }

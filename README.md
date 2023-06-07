@@ -109,7 +109,8 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - Support `stable` rust
 - Support builders providing own interface lists (default bindings)
 - Improve graph validation
-- Make Catalog cloning cheap
+- Make `Scope`s external to `Builder`s so they could be overridden
+- Allow dynamic registration (without cloning entire catalogs)
 - Consider using traits to map `Arc`, `Option`, `Vec` to dependency specs instead of relying on macro magic
 - Add `trybuild` tests (see https://youtu.be/geovSK3wMB8?t=956)
 - Support generic types

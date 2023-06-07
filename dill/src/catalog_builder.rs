@@ -62,22 +62,22 @@ impl CatalogBuilder {
         self
     }
 
-    // TODO: Replace with generic add<B: Into<Builder>>?
-    pub fn add_factory<Fct, Impl>(&mut self, factory: Fct) -> &mut Self
+    pub fn add_value<Impl>(&mut self, value: Impl) -> &mut Self
     where
-        Fct: 'static + Fn() -> Impl + Send + Sync,
         Impl: 'static + Send + Sync,
     {
-        self.add_builder(Factory::new(factory));
+        self.add_builder(Arc::new(value));
         self
     }
 
-    // TODO: Replace with generic add<B: Into<Builder>>?
-    pub fn add_value<'a, Impl>(&'a mut self, value: Impl) -> &mut Self
+    /// Uses the provided factory once and caches the instance in a [Singleton]
+    /// scope
+    pub fn add_value_lazy<Fct, Impl>(&mut self, factory: Fct) -> &mut Self
     where
-        Impl: 'static + Send + Sync,
+        Fct: FnOnce() -> Impl + Send + Sync + 'static,
+        Impl: Send + Sync + 'static,
     {
-        self.add_builder(Prebuilt::from_value(value));
+        self.add_builder(Lazy::new(factory));
         self
     }
 
@@ -181,3 +181,21 @@ impl CatalogBuilder {
         }
     }
 }
+
+/*
+pub trait Addable {
+    fn add(self, b: &mut CatalogBuilder);
+}
+
+impl<T> Addable for T {
+    default fn add(self, b: &mut CatalogBuilder) {
+        b.add_value_raw(self);
+    }
+}
+
+impl<T> Addable for Arc<T> {
+    fn add(self, b: &mut CatalogBuilder) {
+        b.add_value_arc(self);
+    }
+}
+*/

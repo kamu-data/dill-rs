@@ -10,12 +10,38 @@ fn test_add_value() {
 
     let val = cat.get_one::<String>().unwrap();
     assert_eq!(val.as_ref(), "foo");
+
+    let val2 = cat.get_one::<String>().unwrap();
+    assert_eq!(val.as_ptr(), val2.as_ptr());
 }
 
 #[test]
-fn test_add_factory() {
+fn test_add_value_lazy() {
     let mut cat = CatalogBuilder::new();
-    cat.add_factory(|| "foo".to_owned());
+    cat.add_value_lazy(|| "foo".to_owned());
+    let cat = cat.build();
+
+    let val = cat.get_one::<String>().unwrap();
+    assert_eq!(val.as_ref(), "foo");
+
+    let val2 = cat.get_one::<String>().unwrap();
+    assert_eq!(val.as_ptr(), val2.as_ptr());
+}
+
+#[test]
+fn test_add_builder_arc() {
+    let mut cat = CatalogBuilder::new();
+    cat.add_builder(Arc::new("foo".to_owned()));
+    let cat = cat.build();
+
+    let val = cat.get_one::<String>().unwrap();
+    assert_eq!(val.as_ref(), "foo");
+}
+
+#[test]
+fn test_add_builder_fn() {
+    let mut cat = CatalogBuilder::new();
+    cat.add_builder(|| Arc::new("foo".to_owned()));
     let cat = cat.build();
 
     let val = cat.get_one::<String>().unwrap();
