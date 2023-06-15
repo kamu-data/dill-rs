@@ -63,3 +63,21 @@ fn test_validate_static_graph() {
     let cat = b.build();
     cat.get_one::<dyn A>().unwrap();
 }
+
+#[test]
+fn test_validate_ingores_bound_fields() {
+    trait A: Send + Sync {}
+
+    #[allow(dead_code)]
+    #[component]
+    struct AImpl {
+        foo: i32,
+    }
+    impl A for AImpl {}
+
+    let mut b = CatalogBuilder::new();
+    b.add_builder(builder_for::<AImpl>().with_foo(10));
+    b.bind::<dyn A, AImpl>();
+
+    b.validate().unwrap();
+}

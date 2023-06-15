@@ -134,5 +134,8 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - improve catalog fluent interface (or macro?)
 - proc macro error handling
 - build a type without registering
+- Support PImpl idiom, where `Arc<dyn Iface>` can be hidden behind a movable object
+  - This even further hides lifetime management from consumers
+  - Allows generic methods to be implemented to improve usability of `dyn Trait` (e.g. accepting `impl AsRef<str>` parameters instead of `&str`)
 
 

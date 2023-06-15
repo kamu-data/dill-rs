@@ -275,7 +275,7 @@ fn implement_arg(
     };
 
     // TODO: Make these rules recursice
-    let check_dependency = match &injection_type {
+    let do_check_dependency = match &injection_type {
         InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
         InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
         InjectionType::Option { element } => match element.as_ref() {
@@ -289,6 +289,15 @@ fn implement_arg(
             _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
         },
         InjectionType::Value { typ } => quote! { ::dill::OneOf::<#typ>::check(cat) },
+    };
+    let check_dependency = match &injection_type {
+        InjectionType::Reference { .. } => quote! { #do_check_dependency },
+        _ => quote! {
+            match &self.#override_fn_name {
+                Some(_) => Ok(()),
+                _ => #do_check_dependency,
+            }
+        },
     };
 
     let from_catalog = match &injection_type {
@@ -312,8 +321,8 @@ fn implement_arg(
     let prepare_dependency = match &injection_type {
         InjectionType::Reference { .. } => quote! { let #name = #from_catalog; },
         _ => quote! {
-            let #name = match self.#override_fn_name {
-                Some(ref fun) => fun(cat)?,
+            let #name = match &self.#override_fn_name {
+                Some(fun) => fun(cat)?,
                 _ => #from_catalog,
             };
         },
