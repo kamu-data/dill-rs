@@ -73,9 +73,7 @@ pub trait ValidationErrorExt {
 impl ValidationErrorExt for Result<(), ValidationError> {
     fn ignore<T: 'static + ?Sized>(self) -> Self {
         let type_id = TypeId::of::<T>();
-        let Err(mut err) = self else {
-            return Ok(())
-        };
+        let Err(mut err) = self else { return Ok(()) };
 
         err.errors.retain(|e| match e {
             InjectionError::Unregistered(e) => e.type_id != type_id,

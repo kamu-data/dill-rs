@@ -47,7 +47,7 @@ pub(crate) fn strip_reference(typ: &syn::Type) -> syn::Type {
 
 pub(crate) fn is_smart_ptr(typ: &syn::Type) -> bool {
     let syn::Type::Path(typepath) = typ else {
-        return false
+        return false;
     };
 
     if typepath.qself.is_some() || typepath.path.segments.len() != 1 {
@@ -76,7 +76,7 @@ pub(crate) fn strip_smart_ptr(typ: &syn::Type) -> syn::Type {
 
 pub(crate) fn is_option(typ: &syn::Type) -> bool {
     let syn::Type::Path(typepath) = typ else {
-        return false
+        return false;
     };
 
     if typepath.qself.is_some() || typepath.path.segments.len() != 1 {
@@ -103,7 +103,7 @@ pub(crate) fn get_option_element_type(typ: &syn::Type) -> syn::Type {
 
 pub(crate) fn is_vec(typ: &syn::Type) -> bool {
     let syn::Type::Path(typepath) = typ else {
-        return false
+        return false;
     };
 
     if typepath.qself.is_some() || typepath.path.segments.len() != 1 {
