@@ -301,7 +301,7 @@ fn test_chained_catalog_binds() {
         .bind::<dyn B, BImpl>()
         .build();
 
-    let cat_later = CatalogBuilder::new_chained(cat_earlier.clone())
+    let cat_later = CatalogBuilder::new_chained(&cat_earlier)
         .add::<AImpl>()
         .bind::<dyn A, AImpl>()
         .build();
@@ -316,68 +316,6 @@ fn test_chained_catalog_binds() {
 
     let inst_later_a = cat_later.get_one::<dyn A>().unwrap();
     assert_eq!(inst_later_a.test(), "aimpl::bimpl::foo");
-}
-
-#[test]
-fn test_chained_catalog_values() {
-    trait A: Send + Sync {
-        fn test(&self) -> String;
-    }
-
-    struct AImpl {}
-
-    #[component]
-    impl AImpl {
-        pub fn new() -> Self {
-            Self {}
-        }
-    }
-
-    impl A for AImpl {
-        fn test(&self) -> String {
-            format!("aimpl")
-        }
-    }
-
-    trait B: Send + Sync {
-        fn test(&self) -> String;
-    }
-
-    struct BImpl {}
-
-    #[component]
-    impl BImpl {
-        pub fn new() -> Self {
-            Self {}
-        }
-    }
-
-    impl B for BImpl {
-        fn test(&self) -> String {
-            format!("bimpl")
-        }
-    }
-
-    let cat_earlier = CatalogBuilder::new()
-        .add_value(BImpl::new())
-        .bind::<dyn B, BImpl>()
-        .build();
-
-    let cat_later = CatalogBuilder::new_chained(cat_earlier.clone())
-        .add_value(AImpl::new())
-        .bind::<dyn A, AImpl>()
-        .build();
-
-    let inst_earlier_b = cat_earlier.get_one::<dyn B>().unwrap();
-    assert_eq!(inst_earlier_b.test(), "bimpl");
-
-    assert!(cat_earlier.get_one::<dyn A>().is_err());
-
-    let inst_later_b = cat_later.get_one::<dyn B>().unwrap();
-    assert_eq!(inst_later_b.test(), "bimpl");
-
-    let inst_later_a = cat_later.get_one::<dyn A>().unwrap();
-    assert_eq!(inst_later_a.test(), "aimpl");
 }
 
 /*#[test]

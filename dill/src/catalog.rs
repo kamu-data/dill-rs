@@ -39,7 +39,7 @@ impl Catalog {
         }))
     }
 
-    pub fn builders(&self) -> Box<dyn Iterator<Item = &dyn Builder>> {
+    pub fn builders<'a>(&'a self) -> Box<dyn Iterator<Item = &dyn Builder> + 'a> {
         let it_builders = self.0.builders.values().map(|b| b.as_ref());
         if let Some(chained_catalog) = &self.0.chained_catalog {
             Box::new(it_builders.chain(chained_catalog.builders()))
@@ -48,13 +48,21 @@ impl Catalog {
         }
     }
 
-    pub fn builders_for<'a, Iface>(&'a self) -> impl Iterator<Item = TypecastBuilder<'a, Iface>>
+    pub fn builders_for<'a, Iface>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = TypecastBuilder<'a, Iface>> + 'a>
     where
         Iface: 'static + ?Sized,
     {
         let iface_type = IfaceTypeId(TypeId::of::<Iface>());
         let bindings = self.0.bindings.get_vec(&&iface_type);
-        TypecastBuilderIterator::new(bindings)
+        let it_bindings = TypecastBuilderIterator::new(bindings);
+
+        if let Some(chained_catalog) = &self.0.chained_catalog {
+            Box::new(it_bindings.chain(chained_catalog.builders_for::<Iface>()))
+        } else {
+            Box::new(it_bindings)
+        }
     }
 
     pub fn get<Spec>(&self) -> Result<Spec::ReturnType, InjectionError>

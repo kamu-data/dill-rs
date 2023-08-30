@@ -28,11 +28,11 @@ impl CatalogBuilder {
         }
     }
 
-    pub fn new_chained(chained_catalog: Catalog) -> Self {
+    pub fn new_chained(chained_catalog: &Catalog) -> Self {
         Self {
             builders: HashMap::new(),
             bindings: MultiMap::new(),
-            chained_catalog: Some(chained_catalog),
+            chained_catalog: Some(chained_catalog.clone()),
         }
     }
 
@@ -129,7 +129,7 @@ impl CatalogBuilder {
         let mut bindings = MultiMap::new();
         std::mem::swap(&mut self.builders, &mut builders);
         std::mem::swap(&mut self.bindings, &mut bindings);
-        Catalog::new(builders, bindings, self.chained_catalog.clone())
+        Catalog::new(builders, bindings, self.chained_catalog.take())
     }
 
     /// Validates the dependency graph returning a combined error.
@@ -183,6 +183,7 @@ impl CatalogBuilder {
         let mut cat = Arc::into_inner(cat.0).unwrap();
         std::mem::swap(&mut self.builders, &mut cat.builders);
         std::mem::swap(&mut self.bindings, &mut cat.bindings);
+        self.chained_catalog = cat.chained_catalog.take();
 
         if errors.len() != 0 {
             Err(ValidationError { errors })
