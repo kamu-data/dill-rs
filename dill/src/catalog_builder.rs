@@ -14,6 +14,7 @@ use crate::*;
 pub struct CatalogBuilder {
     builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
     bindings: MultiMap<IfaceTypeId, Binding>,
+    chained_catalog: Option<Catalog>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -23,13 +24,16 @@ impl CatalogBuilder {
         Self {
             builders: HashMap::new(),
             bindings: MultiMap::new(),
+            chained_catalog: None,
         }
     }
 
     pub fn new_chained(chained_catalog: Catalog) -> Self {
-        let bindings = chained_catalog.0.bindings.clone();
-        let builders = chained_catalog.0.builders.clone();
-        Self { builders, bindings }
+        Self {
+            builders: HashMap::new(),
+            bindings: MultiMap::new(),
+            chained_catalog: Some(chained_catalog),
+        }
     }
 
     pub fn add<Bld: BuilderLike>(&mut self) -> &mut Self {
@@ -125,7 +129,7 @@ impl CatalogBuilder {
         let mut bindings = MultiMap::new();
         std::mem::swap(&mut self.builders, &mut builders);
         std::mem::swap(&mut self.bindings, &mut bindings);
-        Catalog::new(builders, bindings)
+        Catalog::new(builders, bindings, self.chained_catalog.clone())
     }
 
     /// Validates the dependency graph returning a combined error.

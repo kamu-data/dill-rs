@@ -23,18 +23,29 @@ pub struct Catalog(pub(crate) Arc<CatalogInner>);
 pub(crate) struct CatalogInner {
     pub(crate) builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
     pub(crate) bindings: MultiMap<IfaceTypeId, Binding>,
+    pub(crate) chained_catalog: Option<Catalog>,
 }
 
 impl Catalog {
     pub(crate) fn new(
         builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
         bindings: MultiMap<IfaceTypeId, Binding>,
+        chained_catalog: Option<Catalog>,
     ) -> Self {
-        Self(Arc::new(CatalogInner { builders, bindings }))
+        Self(Arc::new(CatalogInner {
+            builders,
+            bindings,
+            chained_catalog,
+        }))
     }
 
-    pub fn builders(&self) -> impl Iterator<Item = &dyn Builder> {
-        self.0.builders.values().map(|b| b.as_ref())
+    pub fn builders(&self) -> Box<dyn Iterator<Item = &dyn Builder>> {
+        let it_builders = self.0.builders.values().map(|b| b.as_ref());
+        if let Some(chained_catalog) = &self.0.chained_catalog {
+            Box::new(it_builders.chain(chained_catalog.builders()))
+        } else {
+            Box::new(it_builders)
+        }
     }
 
     pub fn builders_for<'a, Iface>(&'a self) -> impl Iterator<Item = TypecastBuilder<'a, Iface>>
