@@ -85,20 +85,27 @@ fn test_chained_singleton() {
     struct AImpl {
         // Needed for compiler not to optimize type out
         name: String,
-        b: Arc<dyn B>,
+        b: Option<Arc<dyn B>>,
     }
 
     #[dill::component]
     #[dill::scope(dill::Singleton)]
     impl AImpl {
-        fn new(name: String, b: Arc<dyn B>) -> Self {
+        fn new(name: String, b: Option<Arc<dyn B>>) -> Self {
             Self { name, b }
         }
     }
 
     impl A for AImpl {
         fn test(&self) -> String {
-            format!("aimpl::{}::{}", self.name, self.b.test())
+            format!(
+                "aimpl::{}::{}",
+                self.name,
+                match &self.b {
+                    Some(b) => b.test(),
+                    None => "no-b".to_string(),
+                }
+            )
         }
     }
 
@@ -134,16 +141,23 @@ fn test_chained_singleton() {
         .bind::<dyn B, BImpl>()
         .build();
 
-    // Nothing implements B in earlier catalog, so neither A, nor B can be created
-    assert!(cat_earlier.get::<dill::OneOf<dyn A>>().is_err());
-    assert!(cat_earlier.get::<dill::OneOf<dyn B>>().is_err());
-
-    let inst_a_1 = cat_later.get::<dill::OneOf<dyn A>>().unwrap();
-    let inst_a_2 = cat_later.get::<dill::OneOf<dyn A>>().unwrap();
-
+    let inst_a_1 = cat_earlier.get::<dill::OneOf<dyn A>>().unwrap();
+    let inst_a_2 = cat_earlier.get::<dill::OneOf<dyn A>>().unwrap();
     assert_eq!(
         inst_a_1.as_ref() as *const dyn A,
         inst_a_2.as_ref() as *const dyn A
+    );
+
+    let inst_a_3 = cat_later.get::<dill::OneOf<dyn A>>().unwrap();
+    let inst_a_4 = cat_later.get::<dill::OneOf<dyn A>>().unwrap();
+
+    assert_eq!(
+        inst_a_3.as_ref() as *const dyn A,
+        inst_a_4.as_ref() as *const dyn A
+    );
+    assert_eq!(
+        inst_a_2.as_ref() as *const dyn A,
+        inst_a_3.as_ref() as *const dyn A
     );
 
     let inst_b_1 = cat_later.get::<dill::OneOf<dyn B>>().unwrap();
@@ -159,8 +173,10 @@ fn test_chained_singleton() {
         inst_b_2.as_ref() as *const dyn B
     );
 
-    assert_eq!(inst_a_1.test(), "aimpl::test::bimpl::unique");
-    assert_eq!(inst_a_2.test(), "aimpl::test::bimpl::unique");
+    assert_eq!(inst_a_1.test(), "aimpl::test::no-b");
+    assert_eq!(inst_a_1.test(), "aimpl::test::no-b");
+    assert_eq!(inst_a_3.test(), "aimpl::test::no-b");
+    assert_eq!(inst_a_4.test(), "aimpl::test::no-b");
 
     assert_eq!(inst_b_1.test(), "bimpl::unique");
     assert_eq!(inst_b_2.test(), "bimpl::unique");
