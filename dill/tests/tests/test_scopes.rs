@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 #[test]
 fn test_transient() {
     use dill::*;
@@ -72,4 +74,110 @@ fn test_singleton() {
 
     assert_eq!(inst1.test(), "aimpl::foo");
     assert_eq!(inst2.test(), "aimpl::foo");
+}
+
+#[test]
+fn test_chained_singleton() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    struct AImpl {
+        // Needed for compiler not to optimize type out
+        name: String,
+        b: Option<Arc<dyn B>>,
+    }
+
+    #[dill::component]
+    #[dill::scope(dill::Singleton)]
+    impl AImpl {
+        fn new(name: String, b: Option<Arc<dyn B>>) -> Self {
+            Self { name, b }
+        }
+    }
+
+    impl A for AImpl {
+        fn test(&self) -> String {
+            format!(
+                "aimpl::{}::{}",
+                self.name,
+                match &self.b {
+                    Some(b) => b.test(),
+                    None => "no-b".to_string(),
+                }
+            )
+        }
+    }
+
+    trait B: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    struct BImpl {
+        last_name: String,
+    }
+
+    #[dill::component]
+    #[dill::scope(dill::Singleton)]
+    impl BImpl {
+        pub fn new(last_name: String) -> Self {
+            Self { last_name }
+        }
+    }
+
+    impl B for BImpl {
+        fn test(&self) -> String {
+            format!("bimpl::{}", self.last_name)
+        }
+    }
+
+    let cat_earlier = dill::CatalogBuilder::new()
+        .add_builder(dill::builder_for::<AImpl>().with_name("test".to_string()))
+        .bind::<dyn A, AImpl>()
+        .build();
+
+    let cat_later = dill::CatalogBuilder::new_chained(&cat_earlier)
+        .add_value(BImpl::new("unique".to_string()))
+        .bind::<dyn B, BImpl>()
+        .build();
+
+    let inst_a_1 = cat_earlier.get::<dill::OneOf<dyn A>>().unwrap();
+    let inst_a_2 = cat_earlier.get::<dill::OneOf<dyn A>>().unwrap();
+    assert_eq!(
+        inst_a_1.as_ref() as *const dyn A,
+        inst_a_2.as_ref() as *const dyn A
+    );
+
+    let inst_a_3 = cat_later.get::<dill::OneOf<dyn A>>().unwrap();
+    let inst_a_4 = cat_later.get::<dill::OneOf<dyn A>>().unwrap();
+
+    assert_eq!(
+        inst_a_3.as_ref() as *const dyn A,
+        inst_a_4.as_ref() as *const dyn A
+    );
+    assert_eq!(
+        inst_a_2.as_ref() as *const dyn A,
+        inst_a_3.as_ref() as *const dyn A
+    );
+
+    let inst_b_1 = cat_later.get::<dill::OneOf<dyn B>>().unwrap();
+    let inst_b_2 = cat_later.get::<dill::OneOf<dyn B>>().unwrap();
+
+    assert_eq!(
+        inst_b_1.as_ref() as *const dyn B,
+        inst_b_2.as_ref() as *const dyn B
+    );
+
+    assert_eq!(
+        inst_b_1.as_ref() as *const dyn B,
+        inst_b_2.as_ref() as *const dyn B
+    );
+
+    assert_eq!(inst_a_1.test(), "aimpl::test::no-b");
+    assert_eq!(inst_a_1.test(), "aimpl::test::no-b");
+    assert_eq!(inst_a_3.test(), "aimpl::test::no-b");
+    assert_eq!(inst_a_4.test(), "aimpl::test::no-b");
+
+    assert_eq!(inst_b_1.test(), "bimpl::unique");
+    assert_eq!(inst_b_2.test(), "bimpl::unique");
 }

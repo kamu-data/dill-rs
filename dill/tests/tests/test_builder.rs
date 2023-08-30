@@ -256,6 +256,68 @@ fn test_new_ctor_by_ref() {
     assert_eq!(inst.test(), "aimpl::foo");
 }
 
+#[test]
+fn test_chained_catalog_binds() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    struct AImpl {
+        b: Arc<dyn B>,
+        suffix: String,
+    }
+
+    #[component]
+    impl AImpl {
+        pub fn new(bee: Arc<dyn B>) -> Self {
+            Self {
+                b: bee,
+                suffix: "foo".to_owned(),
+            }
+        }
+    }
+
+    impl A for AImpl {
+        fn test(&self) -> String {
+            format!("aimpl::{}::{}", self.b.test(), self.suffix)
+        }
+    }
+
+    trait B: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    #[component]
+    struct BImpl;
+
+    impl B for BImpl {
+        fn test(&self) -> String {
+            "bimpl".to_owned()
+        }
+    }
+
+    let cat_earlier = CatalogBuilder::new()
+        .add::<BImpl>()
+        .bind::<dyn B, BImpl>()
+        .build();
+
+    let cat_later = CatalogBuilder::new_chained(&cat_earlier)
+        .add::<AImpl>()
+        .bind::<dyn A, AImpl>()
+        .build();
+
+    let inst_earlier_b = cat_earlier.get_one::<dyn B>().unwrap();
+    assert_eq!(inst_earlier_b.test(), "bimpl");
+
+    assert!(cat_earlier.get_one::<dyn A>().is_err());
+
+    let inst_later_b = cat_later.get_one::<dyn B>().unwrap();
+    assert_eq!(inst_later_b.test(), "bimpl");
+
+    let inst_later_a = cat_later.get_one::<dyn A>().unwrap();
+    assert_eq!(inst_later_a.test(), "aimpl::bimpl::foo");
+}
+
 /*#[test]
 fn test_generic_type_from_struct() {
     trait A: Send + Sync {
