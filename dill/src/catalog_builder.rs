@@ -26,6 +26,12 @@ impl CatalogBuilder {
         }
     }
 
+    pub fn new_chained(chained_catalog: Catalog) -> Self {
+        let bindings = chained_catalog.0.bindings.clone();
+        let builders = chained_catalog.0.builders.clone();
+        Self { builders, bindings }
+    }
+
     pub fn add<Bld: BuilderLike>(&mut self) -> &mut Self {
         Bld::register(self);
         self

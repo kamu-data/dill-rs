@@ -1,13 +1,10 @@
 [workspace]
 resolver = "2"
-members = [
-    "dill-impl",
-    "dill",
-]
+members = ["dill-impl", "dill"]
 
 
 [workspace.package]
-version = "0.6.1"
+version = "0.7.0"
 edition = "2021"
 readme = "README.md"
 homepage = "https://github.com/sergiimk/dill-rs"
@@ -16,12 +13,8 @@ documentation = "https://docs.rs/dill"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MIT OR Apache-2.0"
 keywords = ["di", "ioc", "dependency-injection", "dependency-inversion"]
-include = [
-    "benches/*.rs",
-    "src/**/*.rs",
-    "Cargo.toml",
-]
+include = ["benches/*.rs", "src/**/*.rs", "Cargo.toml"]
 
 
 [workspace.dependencies]
-dill-impl = { path = "dill-impl", version = "0.6.1" }
+dill-impl = { path = "dill-impl", version = "0.7.0" }
