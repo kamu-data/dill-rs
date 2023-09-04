@@ -81,3 +81,27 @@ fn test_validate_ingores_bound_fields() {
 
     b.validate().unwrap();
 }
+
+#[test]
+fn test_validate_catalog_inject() {
+    trait A: Send + Sync {}
+
+    #[allow(dead_code)]
+    struct AImpl {
+        catalog: Catalog,
+    }
+
+    #[component]
+    impl AImpl {
+        pub fn new(catalog: Catalog) -> Self {
+            Self { catalog }
+        }
+    }
+    impl A for AImpl {}
+
+    let mut b = CatalogBuilder::new();
+    b.add::<AImpl>();
+    b.bind::<dyn A, AImpl>();
+
+    b.validate().unwrap();
+}
