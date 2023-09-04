@@ -68,6 +68,10 @@ impl DependencySpec for OneOf<Catalog> {
         // TODO: Avoid wrapping in Arc?
         Ok(Arc::new(cat.clone()))
     }
+
+    fn check(_: &Catalog) -> Result<(), InjectionError> {
+        Ok(())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
