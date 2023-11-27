@@ -23,6 +23,11 @@ pub fn scope(_args: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
+#[proc_macro_attribute]
+pub fn interface(_args: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
 fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
     let impl_name = &ast.ident;
     let impl_type = syn::parse2(quote! { #impl_name }).unwrap();
@@ -37,12 +42,15 @@ fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
     let scope_type =
         get_scope(&ast.attrs).unwrap_or_else(|| syn::parse_str("::dill::Transient").unwrap());
 
+    let interfaces = get_interfaces(&ast.attrs);
+
     let mut gen: TokenStream = quote! { #ast }.into();
     let builder: TokenStream = implement_builder(
         &ast.vis,
         &impl_type,
         &impl_generics,
         scope_type,
+        interfaces,
         args,
         false,
     );
@@ -81,9 +89,18 @@ fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream 
     let scope_type =
         get_scope(&ast.attrs).unwrap_or_else(|| syn::parse_str("::dill::Transient").unwrap());
 
+    let interfaces = get_interfaces(&ast.attrs);
+
     let mut gen: TokenStream = quote! { #ast }.into();
-    let builder: TokenStream =
-        implement_builder(&vis, impl_type, impl_generics, scope_type, args, true);
+    let builder: TokenStream = implement_builder(
+        &vis,
+        impl_type,
+        impl_generics,
+        scope_type,
+        interfaces,
+        args,
+        true,
+    );
 
     gen.extend(builder.into_iter());
     gen
@@ -94,6 +111,7 @@ fn implement_builder(
     impl_type: &syn::Type,
     _impl_generics: &syn::Generics,
     scope_type: syn::Path,
+    interfaces: Vec<syn::Type>,
     args: Vec<(syn::Ident, syn::Type)>,
     has_new: bool,
 ) -> TokenStream {
@@ -139,11 +157,17 @@ fn implement_builder(
     };
 
     let gen = quote! {
-        impl ::dill::BuilderLike for #impl_type {
+        impl ::dill::Component for #impl_type {
             type Builder = #builder_name;
+
             fn register(cat: &mut ::dill::CatalogBuilder) {
                 cat.add_builder(Self::builder());
+
+                #(
+                    cat.bind::<#interfaces, #impl_type>();
+                )*
             }
+
             fn builder() -> Self::Builder {
                 #builder_name::new()
             }
@@ -176,12 +200,21 @@ fn implement_builder(
         }
 
         impl ::dill::Builder for #builder_name {
-            fn instance_type_id(&self) -> std::any::TypeId {
+            fn instance_type_id(&self) -> ::std::any::TypeId {
                 ::std::any::TypeId::of::<#impl_type>()
             }
 
             fn instance_type_name(&self) -> &'static str {
                 ::std::any::type_name::<#impl_type>()
+            }
+
+            fn interfaces(&self) -> Vec<::dill::InterfaceDesc> {
+                vec![#(
+                    ::dill::InterfaceDesc {
+                        type_id: ::std::any::TypeId::of::<#interfaces>(),
+                        type_name: ::std::any::type_name::<#interfaces>(),
+                    },
+                )*]
             }
 
             fn get(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<dyn ::std::any::Any + Send + Sync>, ::dill::InjectionError> {
@@ -360,13 +393,30 @@ fn get_scope(attrs: &Vec<syn::Attribute>) -> Option<syn::Path> {
     scope
 }
 
+/// Searches for all `#[interface(X)]` attributes and returns all types
+fn get_interfaces(attrs: &Vec<syn::Attribute>) -> Vec<syn::Type> {
+    let mut interfaces = Vec::new();
+
+    for attr in attrs {
+        if is_dill_attr(attr, "interface") {
+            let iface = attr.parse_args().unwrap();
+            interfaces.push(iface);
+        }
+    }
+
+    interfaces
+}
+
 fn is_dill_attr<I: ?Sized>(attr: &syn::Attribute, ident: &I) -> bool
 where
     syn::Ident: PartialEq<I>,
 {
     if attr.path().is_ident(ident) {
         true
-    } else if attr.path().segments.len() == 2 && &attr.path().segments[0].ident == "dill" {
+    } else if attr.path().segments.len() == 2
+        && &attr.path().segments[0].ident == "dill"
+        && attr.path().segments[1].ident == *ident
+    {
         true
     } else {
         false

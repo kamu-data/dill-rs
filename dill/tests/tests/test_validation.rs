@@ -76,7 +76,7 @@ fn test_validate_ingores_bound_fields() {
     impl A for AImpl {}
 
     let mut b = CatalogBuilder::new();
-    b.add_builder(builder_for::<AImpl>().with_foo(10));
+    b.add_builder(AImpl::builder().with_foo(10));
     b.bind::<dyn A, AImpl>();
 
     b.validate().unwrap();

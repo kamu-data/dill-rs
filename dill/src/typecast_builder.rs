@@ -41,6 +41,10 @@ where
         self.builder.instance_type_name()
     }
 
+    fn interfaces(&self) -> Vec<InterfaceDesc> {
+        self.builder.interfaces()
+    }
+
     fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         self.builder.get(cat)
     }

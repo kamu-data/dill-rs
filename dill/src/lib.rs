@@ -153,7 +153,7 @@
 //!
 //! let cat = CatalogBuilder::new()
 //!     .add_builder(
-//!         builder_for::<ConnectionPool>()
+//!         ConnectionPool::builder()
 //!             .with_host("foo".to_owned())
 //!             .with_port(8080),
 //!     )

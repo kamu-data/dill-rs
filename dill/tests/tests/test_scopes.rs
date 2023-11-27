@@ -131,8 +131,10 @@ fn test_chained_singleton() {
         }
     }
 
+    use dill::Component;
+
     let cat_earlier = dill::CatalogBuilder::new()
-        .add_builder(dill::builder_for::<AImpl>().with_name("test".to_string()))
+        .add_builder(AImpl::builder().with_name("test".to_string()))
         .bind::<dyn A, AImpl>()
         .build();
 

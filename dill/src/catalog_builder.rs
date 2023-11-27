@@ -36,8 +36,12 @@ impl CatalogBuilder {
         }
     }
 
-    pub fn add<Bld: BuilderLike>(&mut self) -> &mut Self {
-        Bld::register(self);
+    /// Registers a component using its associated builder.
+    ///
+    /// Note that unline [CatalogBuilder::add_builder()] this will also bind the
+    /// implementation to component's default interfaces.
+    pub fn add<C: Component>(&mut self) -> &mut Self {
+        C::register(self);
         self
     }
 
@@ -102,7 +106,7 @@ impl CatalogBuilder {
 
         let builder = self.builders.get(&impl_type);
         if builder.is_none() {
-            panic!("Interface type {} is not registered", type_name::<Iface>());
+            panic!("Builder for type {} is not registered", type_name::<Impl>());
         }
 
         self.bindings.insert(
@@ -192,21 +196,3 @@ impl CatalogBuilder {
         }
     }
 }
-
-/*
-pub trait Addable {
-    fn add(self, b: &mut CatalogBuilder);
-}
-
-impl<T> Addable for T {
-    default fn add(self, b: &mut CatalogBuilder) {
-        b.add_value_raw(self);
-    }
-}
-
-impl<T> Addable for Arc<T> {
-    fn add(self, b: &mut CatalogBuilder) {
-        b.add_value_arc(self);
-    }
-}
-*/
