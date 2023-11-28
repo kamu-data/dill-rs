@@ -11,6 +11,7 @@ use crate::*;
 pub trait Builder: Send + Sync {
     fn instance_type_id(&self) -> TypeId;
     fn instance_type_name(&self) -> &'static str;
+    fn interfaces(&self) -> Vec<InterfaceDesc>; // TODO: Avoid allocating
     fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError>;
     fn check(&self, cat: &Catalog) -> Result<(), ValidationError>;
 }
@@ -19,40 +20,17 @@ pub trait TypedBuilder<T: Send + Sync>: Builder {
     fn get(&self, cat: &Catalog) -> Result<Arc<T>, InjectionError>;
 }
 
-/// Allows [CatalogBuilder::add()] to accept both impl types with associated
-/// builder and custom builders
-pub trait BuilderLike {
+/// Allows [CatalogBuilder::add()] to accept types with associated builder
+pub trait Component {
     type Builder: Builder;
-    fn register(cat: &mut CatalogBuilder);
     fn builder() -> Self::Builder;
+    fn register(cat: &mut CatalogBuilder);
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
-/// Used to create an instance of a default builder for a component.
-/// This instance can be then be parametrized before adding it into the
-/// [CatalogBuilder].
-///
-/// # Examples
-///
-/// ```
-/// use dill::*;
-///
-/// #[component]
-/// struct ConnectionPool {
-///     host: String,
-///     port: u16,
-/// }
-///
-/// let catalog = CatalogBuilder::new()
-///     .add_builder(
-///         builder_for::<ConnectionPool>()
-///             .with_host("foo".to_owned())
-///             .with_port(8080)
-///     );
-/// ```
-pub fn builder_for<B: BuilderLike>() -> B::Builder {
-    B::builder()
+#[derive(Debug, Copy, Clone)]
+pub struct InterfaceDesc {
+    pub type_id: TypeId,
+    pub type_name: &'static str,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -68,6 +46,10 @@ where
 
     fn instance_type_name(&self) -> &'static str {
         std::any::type_name::<Impl>()
+    }
+
+    fn interfaces(&self) -> Vec<InterfaceDesc> {
+        Vec::new()
     }
 
     fn get(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
@@ -102,6 +84,10 @@ where
 
     fn instance_type_name(&self) -> &'static str {
         std::any::type_name::<Impl>()
+    }
+
+    fn interfaces(&self) -> Vec<InterfaceDesc> {
+        Vec::new()
     }
 
     fn get(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
@@ -164,6 +150,10 @@ where
 
     fn instance_type_name(&self) -> &'static str {
         std::any::type_name::<Impl>()
+    }
+
+    fn interfaces(&self) -> Vec<InterfaceDesc> {
+        Vec::new()
     }
 
     fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {

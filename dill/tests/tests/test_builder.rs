@@ -35,6 +35,35 @@ fn test_type_info() {
 }
 
 #[test]
+fn test_default_interfaces() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    #[component]
+    #[interface(dyn A)]
+    struct AImpl;
+
+    impl A for AImpl {
+        fn test(&self) -> String {
+            "foo".to_owned()
+        }
+    }
+
+    let cat = CatalogBuilder::new().add::<AImpl>().build();
+
+    let b = cat.builders().next().unwrap();
+    assert_eq!(b.interfaces().len(), 1);
+    assert_eq!(
+        b.interfaces()[0].type_name,
+        "dyn unit::tests::test_builder::test_default_interfaces::A"
+    );
+
+    let a = cat.get_one::<dyn A>().unwrap();
+    assert_eq!(a.test(), "foo");
+}
+
+#[test]
 fn test_with_args_by_value() {
     trait A: Send + Sync {
         fn test(&self) -> String;
@@ -53,11 +82,7 @@ fn test_with_args_by_value() {
     }
 
     let cat = CatalogBuilder::new()
-        .add_builder(
-            builder_for::<AImpl>()
-                .with_host("foo".to_owned())
-                .with_port(8080),
-        )
+        .add_builder(AImpl::builder().with_host("foo".to_owned()).with_port(8080))
         .bind::<dyn A, AImpl>()
         .build();
 
@@ -66,7 +91,7 @@ fn test_with_args_by_value() {
 
     let cat = CatalogBuilder::new()
         .add_builder(
-            builder_for::<AImpl>()
+            AImpl::builder()
                 .with_host_fn(|_| Ok("bar".to_owned()))
                 .with_port_fn(|_| Ok(8080)),
         )
@@ -116,7 +141,7 @@ fn test_with_args_by_ref() {
     }
 
     let cat = CatalogBuilder::new()
-        .add_builder(builder_for::<AImpl>().with_b(Arc::new(BImpl1)))
+        .add_builder(AImpl::builder().with_b(Arc::new(BImpl1)))
         .bind::<dyn A, AImpl>()
         .add::<BImpl2>()
         .bind::<dyn B, BImpl2>()
@@ -126,7 +151,7 @@ fn test_with_args_by_ref() {
     assert_eq!(inst.test(), "aimpl::bimpl1");
 
     let cat = CatalogBuilder::new()
-        .add_builder(builder_for::<AImpl>().with_b_fn(|_| Ok(Arc::new(BImpl1))))
+        .add_builder(AImpl::builder().with_b_fn(|_| Ok(Arc::new(BImpl1))))
         .bind::<dyn A, AImpl>()
         .build();
 
@@ -254,68 +279,6 @@ fn test_new_ctor_by_ref() {
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::foo");
-}
-
-#[test]
-fn test_chained_catalog_binds() {
-    trait A: Send + Sync {
-        fn test(&self) -> String;
-    }
-
-    struct AImpl {
-        b: Arc<dyn B>,
-        suffix: String,
-    }
-
-    #[component]
-    impl AImpl {
-        pub fn new(bee: Arc<dyn B>) -> Self {
-            Self {
-                b: bee,
-                suffix: "foo".to_owned(),
-            }
-        }
-    }
-
-    impl A for AImpl {
-        fn test(&self) -> String {
-            format!("aimpl::{}::{}", self.b.test(), self.suffix)
-        }
-    }
-
-    trait B: Send + Sync {
-        fn test(&self) -> String;
-    }
-
-    #[component]
-    struct BImpl;
-
-    impl B for BImpl {
-        fn test(&self) -> String {
-            "bimpl".to_owned()
-        }
-    }
-
-    let cat_earlier = CatalogBuilder::new()
-        .add::<BImpl>()
-        .bind::<dyn B, BImpl>()
-        .build();
-
-    let cat_later = CatalogBuilder::new_chained(&cat_earlier)
-        .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
-        .build();
-
-    let inst_earlier_b = cat_earlier.get_one::<dyn B>().unwrap();
-    assert_eq!(inst_earlier_b.test(), "bimpl");
-
-    assert!(cat_earlier.get_one::<dyn A>().is_err());
-
-    let inst_later_b = cat_later.get_one::<dyn B>().unwrap();
-    assert_eq!(inst_later_b.test(), "bimpl");
-
-    let inst_later_a = cat_later.get_one::<dyn A>().unwrap();
-    assert_eq!(inst_later_a.test(), "aimpl::bimpl::foo");
 }
 
 /*#[test]
