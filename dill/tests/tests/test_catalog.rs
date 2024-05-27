@@ -183,7 +183,7 @@ fn test_chained_catalog_binds() {
         .bind::<dyn B, BImpl>()
         .build();
 
-    let cat_later = CatalogBuilder::new_chained(&cat_earlier)
+    let cat_later = CatalogBuilder::new_chained(cat_earlier.clone())
         .add::<AImpl>()
         .bind::<dyn A, AImpl>()
         .build();
