@@ -420,7 +420,7 @@ where
 }
 
 /// Searches `impl` block for `new()` method
-fn get_new(impl_items: &Vec<syn::ImplItem>) -> Option<&syn::ImplItemFn> {
+fn get_new(impl_items: &[syn::ImplItem]) -> Option<&syn::ImplItemFn> {
     impl_items
         .iter()
         .filter_map(|i| match i {

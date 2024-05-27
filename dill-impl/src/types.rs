@@ -31,10 +31,7 @@ pub(crate) fn deduce_injection_type(typ: &syn::Type) -> InjectionType {
 }
 
 pub(crate) fn is_reference(typ: &syn::Type) -> bool {
-    match typ {
-        syn::Type::Reference(_) => true,
-        _ => false,
-    }
+    matches!(typ, syn::Type::Reference(_))
 }
 
 pub(crate) fn strip_reference(typ: &syn::Type) -> syn::Type {

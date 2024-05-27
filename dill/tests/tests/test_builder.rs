@@ -6,6 +6,7 @@ use dill::*;
 #[test]
 fn test_type_info() {
     trait A: Send + Sync {
+        #[allow(dead_code)]
         fn test(&self) -> String;
     }
 

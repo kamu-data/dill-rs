@@ -6,6 +6,7 @@ use dill::*;
 #[test]
 fn test_validate_static_graph() {
     trait A: Send + Sync {
+        #[allow(dead_code)]
         fn test(&self) -> String;
     }
 
@@ -20,6 +21,7 @@ fn test_validate_static_graph() {
     }
 
     trait B: Send + Sync {
+        #[allow(dead_code)]
         fn test(&self) -> String;
     }
 

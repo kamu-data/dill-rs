@@ -135,6 +135,7 @@ fn test_one_of_with_dependency() {
 #[test]
 fn test_one_of_with_dependency_missing() {
     trait A: Send + Sync {
+        #[allow(dead_code)]
         fn test(&self) -> String;
     }
 
@@ -150,6 +151,7 @@ fn test_one_of_with_dependency_missing() {
     }
 
     trait B: Send + Sync {
+        #[allow(dead_code)]
         fn test(&self) -> String;
     }
 
