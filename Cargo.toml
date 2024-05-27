@@ -4,7 +4,7 @@ members = ["dill-impl", "dill"]
 
 
 [workspace.package]
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 readme = "README.md"
 homepage = "https://github.com/sergiimk/dill-rs"
