@@ -101,7 +101,6 @@ impl CatalogBuilder {
         self
     }
 
-    // TODO: WTF is Unsize
     pub fn bind<Iface, Impl>(&mut self) -> &mut Self
     where
         Iface: 'static + ?Sized,
