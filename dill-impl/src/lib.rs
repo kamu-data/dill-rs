@@ -4,7 +4,6 @@ mod types;
 
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn;
 use types::InjectionType;
 
 #[proc_macro_attribute]
@@ -55,7 +54,7 @@ fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
         false,
     );
 
-    gen.extend(builder.into_iter());
+    gen.extend(builder);
     gen
 }
 
@@ -102,7 +101,7 @@ fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream 
         true,
     );
 
-    gen.extend(builder.into_iter());
+    gen.extend(builder);
     gen
 }
 
@@ -413,13 +412,10 @@ where
 {
     if attr.path().is_ident(ident) {
         true
-    } else if attr.path().segments.len() == 2
-        && &attr.path().segments[0].ident == "dill"
-        && attr.path().segments[1].ident == *ident
-    {
-        true
     } else {
-        false
+        attr.path().segments.len() == 2
+            && &attr.path().segments[0].ident == "dill"
+            && attr.path().segments[1].ident == *ident
     }
 }
 
@@ -431,6 +427,5 @@ fn get_new(impl_items: &Vec<syn::ImplItem>) -> Option<&syn::ImplItemFn> {
             syn::ImplItem::Fn(m) => Some(m),
             _ => None,
         })
-        .filter(|m| m.sig.ident == "new")
-        .next()
+        .find(|m| m.sig.ident == "new")
 }

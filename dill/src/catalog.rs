@@ -55,7 +55,7 @@ impl Catalog {
         Iface: 'static + ?Sized,
     {
         let iface_type = IfaceTypeId(TypeId::of::<Iface>());
-        let bindings = self.0.bindings.get_vec(&&iface_type);
+        let bindings = self.0.bindings.get_vec(&iface_type);
         let it_bindings = TypecastBuilderIterator::new(bindings);
 
         if let Some(chained_catalog) = &self.0.chained_catalog {

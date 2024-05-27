@@ -1,5 +1,4 @@
 use quote::ToTokens;
-use syn;
 
 pub(crate) enum InjectionType {
     Arc { inner: syn::Type },

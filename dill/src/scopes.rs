@@ -18,6 +18,12 @@ pub trait Scope {
 /// instance.
 pub struct Transient;
 
+impl Default for Transient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Transient {
     pub fn new() -> Self {
         Self {}
@@ -40,6 +46,12 @@ impl Scope for Transient {
 /// program.
 pub struct Singleton {
     instance: Mutex<Option<Arc<dyn Any + Send + Sync>>>,
+}
+
+impl Default for Singleton {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Singleton {

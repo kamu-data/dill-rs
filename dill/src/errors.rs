@@ -80,7 +80,7 @@ impl ValidationErrorExt for Result<(), ValidationError> {
             InjectionError::Ambiguous(e) => e.type_id != type_id,
         });
 
-        if err.errors.len() == 0 {
+        if err.errors.is_empty() {
             Ok(())
         } else {
             Err(err)

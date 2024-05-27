@@ -51,7 +51,7 @@ where
 
     default fn check(cat: &Catalog) -> Result<(), InjectionError> {
         let mut builders = cat.builders_for::<Iface>();
-        if let Some(_) = builders.next() {
+        if builders.next().is_some() {
             if builders.next().is_some() {
                 Err(InjectionError::ambiguous::<Iface>())
             } else {

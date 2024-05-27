@@ -19,6 +19,12 @@ pub struct CatalogBuilder {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+impl Default for CatalogBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CatalogBuilder {
     pub fn new() -> Self {
         Self {
@@ -189,7 +195,7 @@ impl CatalogBuilder {
         std::mem::swap(&mut self.bindings, &mut cat.bindings);
         self.chained_catalog = cat.chained_catalog.take();
 
-        if errors.len() != 0 {
+        if !errors.is_empty() {
             Err(ValidationError { errors })
         } else {
             Ok(())
