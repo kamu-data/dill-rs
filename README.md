@@ -102,7 +102,7 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - Focus on **constructor injection**
   - Field/property/accessor-based injection would complicate the system, and in our experience is of little use
 - Put **implementation in control**
-  - The type implementor (and not type user) usually has the best knowledge of what the optimal lifecycle for the type should be and its and concurrency characteristics, thus implementors should be in control of the defaults
+  - The type implementor (and not type user) usually has the best knowledge of what the optimal lifecycle for the type should be and its concurrency characteristics, thus implementors should be in control of the defaults
 
 
 # TODO

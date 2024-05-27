@@ -163,7 +163,7 @@ impl CatalogBuilder {
         // TODO: Should return a validation report type that will track
         // - Unresolved dependencies
         // - Ambiguous dependencies
-        // - Missing dependenies with defaults
+        // - Missing dependencies with defaults
         // - AllOf that don't resolve to anything
         //
         // Users will then be able to specify whether to treat them as errors / warnings

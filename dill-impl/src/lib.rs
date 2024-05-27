@@ -13,7 +13,9 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     match ast {
         syn::Item::Struct(struct_ast) => component_from_struct(struct_ast),
         syn::Item::Impl(impl_ast) => component_from_impl(vis, impl_ast),
-        _ => panic!("The #[component] macro can only be used on struct definiton or an impl block"),
+        _ => {
+            panic!("The #[component] macro can only be used on struct definition or an impl block")
+        }
     }
 }
 
@@ -306,7 +308,7 @@ fn implement_arg(
         }
     };
 
-    // TODO: Make these rules recursice
+    // TODO: Make these rules recursive
     let do_check_dependency = match &injection_type {
         InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
         InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },

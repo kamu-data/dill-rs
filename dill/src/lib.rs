@@ -48,7 +48,7 @@
 //! ## Using trait objects (aka Interfaces)
 //!
 //! Every type can be associated with multiple traits that it implements using
-//! [`CatalogBuilder::bind()`] method, allowing dynamically picking best
+//! [`CatalogBuilder::bind()`] method, allowing dynamically picking the best
 //! implementation to use (e.g. based on config) or even using multiple
 //! implementations at once (e.g. plugins).
 //!
