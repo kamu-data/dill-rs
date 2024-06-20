@@ -138,7 +138,7 @@ fn test_chained_singleton() {
         .bind::<dyn A, AImpl>()
         .build();
 
-    let cat_later = dill::CatalogBuilder::new_chained(cat_earlier.clone())
+    let cat_later = dill::CatalogBuilder::new_chained(&cat_earlier)
         .add_value(BImpl::new("unique".to_string()))
         .bind::<dyn B, BImpl>()
         .build();

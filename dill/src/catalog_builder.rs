@@ -34,11 +34,11 @@ impl CatalogBuilder {
         }
     }
 
-    pub fn new_chained(chained_catalog: Catalog) -> Self {
+    pub fn new_chained(chained_catalog: &Catalog) -> Self {
         Self {
             builders: HashMap::new(),
             bindings: MultiMap::new(),
-            chained_catalog: Some(chained_catalog),
+            chained_catalog: Some(chained_catalog.clone()),
         }
     }
 
