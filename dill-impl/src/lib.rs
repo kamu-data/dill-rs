@@ -6,6 +6,8 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use types::InjectionType;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     let ast: syn::Item = syn::parse(item).unwrap();
@@ -19,15 +21,28 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[proc_macro_attribute]
 pub fn scope(_args: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[proc_macro_attribute]
 pub fn interface(_args: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[proc_macro_attribute]
+pub fn meta(_args: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
     let impl_name = &ast.ident;
@@ -44,6 +59,7 @@ fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
         get_scope(&ast.attrs).unwrap_or_else(|| syn::parse_str("::dill::Transient").unwrap());
 
     let interfaces = get_interfaces(&ast.attrs);
+    let meta = get_meta(&ast.attrs);
 
     let mut gen: TokenStream = quote! { #ast }.into();
     let builder: TokenStream = implement_builder(
@@ -52,6 +68,7 @@ fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
         &impl_generics,
         scope_type,
         interfaces,
+        meta,
         args,
         false,
     );
@@ -59,6 +76,8 @@ fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
     gen.extend(builder);
     gen
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream {
     let impl_generics = &ast.generics;
@@ -91,6 +110,7 @@ fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream 
         get_scope(&ast.attrs).unwrap_or_else(|| syn::parse_str("::dill::Transient").unwrap());
 
     let interfaces = get_interfaces(&ast.attrs);
+    let meta = get_meta(&ast.attrs);
 
     let mut gen: TokenStream = quote! { #ast }.into();
     let builder: TokenStream = implement_builder(
@@ -99,6 +119,7 @@ fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream 
         impl_generics,
         scope_type,
         interfaces,
+        meta,
         args,
         true,
     );
@@ -107,18 +128,33 @@ fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream 
     gen
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[allow(clippy::too_many_arguments)]
 fn implement_builder(
     impl_vis: &syn::Visibility,
     impl_type: &syn::Type,
     _impl_generics: &syn::Generics,
     scope_type: syn::Path,
     interfaces: Vec<syn::Type>,
+    meta: Vec<syn::ExprStruct>,
     args: Vec<(syn::Ident, syn::Type)>,
     has_new: bool,
 ) -> TokenStream {
     let builder_name = format_ident!("{}Builder", quote! { #impl_type }.to_string());
 
     let arg_name: Vec<_> = args.iter().map(|(name, _)| name).collect();
+
+    let meta_provide: Vec<_> = meta
+        .iter()
+        .enumerate()
+        .map(|(i, e)| implmenent_meta_provide(i, e))
+        .collect();
+    let meta_vars: Vec<_> = meta
+        .iter()
+        .enumerate()
+        .map(|(i, e)| implmenent_meta_var(i, e))
+        .collect();
 
     let mut arg_override_fn_field = Vec::new();
     let mut arg_override_fn_field_ctor = Vec::new();
@@ -182,6 +218,8 @@ fn implement_builder(
         }
 
         impl #builder_name {
+            #( #meta_vars )*
+
             pub fn new() -> Self {
                 Self {
                     scope: #scope_type::new(),
@@ -216,6 +254,10 @@ fn implement_builder(
                         type_name: ::std::any::type_name::<#interfaces>(),
                     },
                 )*]
+            }
+
+            fn metadata<'a>(&'a self, clb: & mut dyn FnMut(&'a dyn std::any::Any) -> bool) {
+                #( #meta_provide )*
             }
 
             fn get(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<dyn ::std::any::Any + Send + Sync>, ::dill::InjectionError> {
@@ -257,6 +299,8 @@ fn implement_builder(
 
     gen.into()
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 fn implement_arg(
     name: &syn::Ident,
@@ -377,6 +421,25 @@ fn implement_arg(
     )
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn implmenent_meta_var(index: usize, expr: &syn::ExprStruct) -> proc_macro2::TokenStream {
+    let ident = format_ident!("_meta_{index}");
+    let typ = &expr.path;
+    quote! {
+        const #ident: #typ = #expr;
+    }
+}
+
+fn implmenent_meta_provide(index: usize, _expr: &syn::ExprStruct) -> proc_macro2::TokenStream {
+    let ident = format_ident!("_meta_{index}");
+    quote! {
+        if !clb(&Self::#ident) { return }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 /// Searches for `#[scope(X)]` attribute and returns `X`
 fn get_scope(attrs: &Vec<syn::Attribute>) -> Option<syn::Path> {
     let mut scope = None;
@@ -394,6 +457,8 @@ fn get_scope(attrs: &Vec<syn::Attribute>) -> Option<syn::Path> {
     scope
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 /// Searches for all `#[interface(X)]` attributes and returns all types
 fn get_interfaces(attrs: &Vec<syn::Attribute>) -> Vec<syn::Type> {
     let mut interfaces = Vec::new();
@@ -408,6 +473,24 @@ fn get_interfaces(attrs: &Vec<syn::Attribute>) -> Vec<syn::Type> {
     interfaces
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
+/// Searches for all `#[meta(X)]` attributes and returns all expressions
+fn get_meta(attrs: &Vec<syn::Attribute>) -> Vec<syn::ExprStruct> {
+    let mut meta = Vec::new();
+
+    for attr in attrs {
+        if is_dill_attr(attr, "meta") {
+            let expr = attr.parse_args().unwrap();
+            meta.push(expr);
+        }
+    }
+
+    meta
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 fn is_dill_attr<I: ?Sized>(attr: &syn::Attribute, ident: &I) -> bool
 where
     syn::Ident: PartialEq<I>,
@@ -420,6 +503,8 @@ where
             && attr.path().segments[1].ident == *ident
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 /// Searches `impl` block for `new()` method
 fn get_new(impl_items: &[syn::ImplItem]) -> Option<&syn::ImplItemFn> {

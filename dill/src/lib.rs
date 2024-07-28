@@ -1,5 +1,6 @@
 #![feature(unsize)]
 #![feature(min_specialization)]
+#![feature(error_generic_member_access)]
 
 //! Runtime dependency injection.
 //!

@@ -139,6 +139,7 @@ fn test_one_of_with_dependency_missing() {
         fn test(&self) -> String;
     }
 
+    #[allow(dead_code)]
     #[component]
     struct AImpl {
         b: Arc<dyn B>,

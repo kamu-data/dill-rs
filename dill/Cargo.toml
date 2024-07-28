@@ -15,4 +15,4 @@ edition = { workspace = true }
 [dependencies]
 dill-impl = { workspace = true }
 thiserror = "1"
-multimap = "0.9"
+multimap = "0.10"

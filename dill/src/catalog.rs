@@ -65,6 +65,29 @@ impl Catalog {
         }
     }
 
+    pub fn builders_for_with_meta<'a, Iface, Meta, P>(
+        &'a self,
+        pred: P,
+    ) -> Box<dyn Iterator<Item = TypecastBuilder<'a, Iface>> + 'a>
+    where
+        Iface: 'static + ?Sized,
+        Meta: 'static,
+        P: Fn(&Meta) -> bool,
+        P: 'a,
+    {
+        let iface_type = IfaceTypeId(TypeId::of::<Iface>());
+        let bindings = self.0.bindings.get_vec(&iface_type);
+
+        let it_bindings =
+            TypecastPredicateBuilderIterator::new(bindings, move |b| b.metadata_contains(&pred));
+
+        if let Some(chained_catalog) = &self.0.chained_catalog {
+            Box::new(it_bindings.chain(chained_catalog.builders_for::<Iface>()))
+        } else {
+            Box::new(it_bindings)
+        }
+    }
+
     pub fn get<Spec>(&self) -> Result<Spec::ReturnType, InjectionError>
     where
         Spec: DependencySpec + 'static,
