@@ -16,15 +16,15 @@ pub trait Builder: Send + Sync {
     /// format
     fn instance_type_name(&self) -> &'static str;
 
-    // TODO: Avoid allocating
-    /// Lists interfaces that the supplied type supports
-    fn interfaces(&self) -> Vec<InterfaceDesc>;
+    /// Lists interfaces that the supplied type supports. Avoid using this
+    /// low-level method directly - use [`BuilderExt`] convenience methods
+    /// instead.
+    fn interfaces(&self, clb: &mut dyn FnMut(&InterfaceDesc) -> bool);
 
     /// Provider interface for accessing associated metadata. Avoid using this
     /// low-level method directly - use [`BuilderExt`] convenience methods
     /// instead.
-    #[allow(unused_variables)]
-    fn metadata<'a>(&'a self, clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
+    fn metadata<'a>(&'a self, clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool);
 
     /// Get an instance of the supplied type
     fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError>;
@@ -36,6 +36,10 @@ pub trait Builder: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait BuilderExt {
+    fn interfaces_get_all(&self) -> Vec<InterfaceDesc>;
+    fn interfaces_contain<Iface: 'static>(&self) -> bool;
+    fn interfaces_contain_type_id(&self, type_id: &TypeId) -> bool;
+
     fn metadata_get_first<Meta: 'static>(&self) -> Option<&Meta>;
     fn metadata_find_first<Meta: 'static>(&self, pred: impl Fn(&Meta) -> bool) -> Option<&Meta>;
     fn metadata_get_all<Meta: 'static>(&self) -> Vec<&Meta>;
@@ -44,6 +48,31 @@ pub trait BuilderExt {
 }
 
 impl<T: Builder + ?Sized> BuilderExt for T {
+    fn interfaces_get_all(&self) -> Vec<InterfaceDesc> {
+        let mut ret = Vec::new();
+        self.interfaces(&mut |i| {
+            ret.push(*i);
+            true
+        });
+        ret
+    }
+
+    fn interfaces_contain<Iface: 'static>(&self) -> bool {
+        let type_id = std::any::TypeId::of::<Iface>();
+        self.interfaces_contain_type_id(&type_id)
+    }
+    fn interfaces_contain_type_id(&self, type_id: &TypeId) -> bool {
+        let mut ret = false;
+        self.interfaces(&mut |i| {
+            if i.type_id == *type_id {
+                ret = true;
+                return false;
+            }
+            true
+        });
+        ret
+    }
+
     fn metadata_get_first<Meta: 'static>(&self) -> Option<&Meta> {
         let mut ret: Option<&Meta> = None;
         self.metadata(&mut |m| {
@@ -143,9 +172,9 @@ where
         std::any::type_name::<Impl>()
     }
 
-    fn interfaces(&self) -> Vec<InterfaceDesc> {
-        Vec::new()
-    }
+    fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
+
+    fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
 
     fn get(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self.clone())
@@ -181,9 +210,9 @@ where
         std::any::type_name::<Impl>()
     }
 
-    fn interfaces(&self) -> Vec<InterfaceDesc> {
-        Vec::new()
-    }
+    fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
+
+    fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
 
     fn get(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self())
@@ -247,9 +276,9 @@ where
         std::any::type_name::<Impl>()
     }
 
-    fn interfaces(&self) -> Vec<InterfaceDesc> {
-        Vec::new()
-    }
+    fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
+
+    fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
 
     fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(TypedBuilder::get(self, cat)?)

@@ -247,13 +247,13 @@ fn implement_builder(
                 ::std::any::type_name::<#impl_type>()
             }
 
-            fn interfaces(&self) -> Vec<::dill::InterfaceDesc> {
-                vec![#(
-                    ::dill::InterfaceDesc {
+            fn interfaces(&self, clb: &mut dyn FnMut(&::dill::InterfaceDesc) -> bool) {
+                #(
+                    if !clb(&::dill::InterfaceDesc {
                         type_id: ::std::any::TypeId::of::<#interfaces>(),
                         type_name: ::std::any::type_name::<#interfaces>(),
-                    },
-                )*]
+                    }) { return }
+                )*
             }
 
             fn metadata<'a>(&'a self, clb: & mut dyn FnMut(&'a dyn std::any::Any) -> bool) {

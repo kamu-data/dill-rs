@@ -54,9 +54,9 @@ fn test_default_interfaces() {
     let cat = CatalogBuilder::new().add::<AImpl>().build();
 
     let b = cat.builders().next().unwrap();
-    assert_eq!(b.interfaces().len(), 1);
+    assert_eq!(b.interfaces_get_all().len(), 1);
     assert_eq!(
-        b.interfaces()[0].type_name,
+        b.interfaces_get_all()[0].type_name,
         "dyn unit::tests::test_builder::test_default_interfaces::A"
     );
 

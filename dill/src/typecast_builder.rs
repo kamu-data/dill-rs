@@ -41,8 +41,8 @@ where
         self.builder.instance_type_name()
     }
 
-    fn interfaces(&self) -> Vec<InterfaceDesc> {
-        self.builder.interfaces()
+    fn interfaces(&self, clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {
+        self.builder.interfaces(clb);
     }
 
     fn metadata<'b, 'c>(&'b self, clb: &'c mut dyn FnMut(&'b dyn std::any::Any) -> bool) {
