@@ -148,12 +148,12 @@ fn implement_builder(
     let meta_provide: Vec<_> = meta
         .iter()
         .enumerate()
-        .map(|(i, e)| implmenent_meta_provide(i, e))
+        .map(|(i, e)| implement_meta_provide(i, e))
         .collect();
     let meta_vars: Vec<_> = meta
         .iter()
         .enumerate()
-        .map(|(i, e)| implmenent_meta_var(i, e))
+        .map(|(i, e)| implement_meta_var(i, e))
         .collect();
 
     let mut arg_override_fn_field = Vec::new();
@@ -423,7 +423,7 @@ fn implement_arg(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn implmenent_meta_var(index: usize, expr: &syn::ExprStruct) -> proc_macro2::TokenStream {
+fn implement_meta_var(index: usize, expr: &syn::ExprStruct) -> proc_macro2::TokenStream {
     let ident = format_ident!("_meta_{index}");
     let typ = &expr.path;
     quote! {
@@ -431,7 +431,7 @@ fn implmenent_meta_var(index: usize, expr: &syn::ExprStruct) -> proc_macro2::Tok
     }
 }
 
-fn implmenent_meta_provide(index: usize, _expr: &syn::ExprStruct) -> proc_macro2::TokenStream {
+fn implement_meta_provide(index: usize, _expr: &syn::ExprStruct) -> proc_macro2::TokenStream {
     let ident = format_ident!("_meta_{index}");
     quote! {
         if !clb(&Self::#ident) { return }
