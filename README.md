@@ -80,12 +80,15 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - `#[component]` macro can derive `Builder`:
   - When used directly for a `struct` or on `impl` block with `Impl::new()` function
   - Can inject as `Arc<T>`, `T: Clone`, `&T`
-  - `Option<T>` is interpreted as `OneOf<T>` spec
+  - `Option<T>` is interpreted as `Maybe<OneOf<T>>` spec
   - `Vec<T>` is interpreted as `AllOf<T>` spec
   - Supports custom argument bindings in `Builder`
+  - Supports default interface bindings via `#[interface]` attribute
+  - Supports metadata association via `#[meta(...)]` attribute
 - Prebuilt / add by value support
 - By value injection of `Clone` types
 - `Catalog` can be self-injected
+- Chaining of `Catalog`s allows adding values dynamically (e.g. in middleware chains like `tower`)
 
 
 # Design Principles
@@ -115,7 +118,7 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - Add `trybuild` tests (see https://youtu.be/geovSK3wMB8?t=956)
 - Support generic types
 - Replace `add_*` with generic `add<B: Into<Builder>>`
-- value by reference in new()
+- value by reference in `new()`
 - + Send + Sync plague  https://www.reddit.com/r/rust/comments/6dz0xh/abstracting_over_reference_counted_types_rc_and/
 - Add low-overhead resolution stack to errors (e.g. populated on unwind)
 - Extra scopes
@@ -124,13 +127,11 @@ assert_eq!(inst.test(), "aimpl::bimpl");
   - task
   - catalog?
 - thread safety
-- adding values to catalog dynamically
 - lazy values
 - externally defined types
 - custom builders
 - error handling
 - doctests
-- Advanced queries (based on metadata + custom filters)
 - improve catalog fluent interface (or macro?)
 - proc macro error handling
 - build a type without registering

@@ -10,6 +10,7 @@ fn test_validate_static_graph() {
         fn test(&self) -> String;
     }
 
+    #[allow(dead_code)]
     #[component]
     struct AImpl {
         b: Arc<dyn B>,

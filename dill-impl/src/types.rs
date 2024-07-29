@@ -1,5 +1,7 @@
 use quote::ToTokens;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) enum InjectionType {
     Arc { inner: syn::Type },
     Reference { inner: syn::Type },
@@ -30,6 +32,8 @@ pub(crate) fn deduce_injection_type(typ: &syn::Type) -> InjectionType {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn is_reference(typ: &syn::Type) -> bool {
     matches!(typ, syn::Type::Reference(_))
 }
@@ -40,6 +44,8 @@ pub(crate) fn strip_reference(typ: &syn::Type) -> syn::Type {
         _ => typ.clone(),
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn is_smart_ptr(typ: &syn::Type) -> bool {
     let syn::Type::Path(typepath) = typ else {
@@ -70,6 +76,8 @@ pub(crate) fn strip_smart_ptr(typ: &syn::Type) -> syn::Type {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn is_option(typ: &syn::Type) -> bool {
     let syn::Type::Path(typepath) = typ else {
         return false;
@@ -97,6 +105,8 @@ pub(crate) fn get_option_element_type(typ: &syn::Type) -> syn::Type {
     syn::parse2(args.args.to_token_stream()).unwrap()
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn is_vec(typ: &syn::Type) -> bool {
     let syn::Type::Path(typepath) = typ else {
         return false;
@@ -123,3 +133,5 @@ pub(crate) fn get_vec_item_type(typ: &syn::Type) -> syn::Type {
     };
     syn::parse2(args.args.to_token_stream()).unwrap()
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
