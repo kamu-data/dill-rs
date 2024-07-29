@@ -65,15 +65,13 @@ impl Catalog {
         }
     }
 
-    pub fn builders_for_with_meta<'a, Iface, Meta, P>(
+    pub fn builders_for_with_meta<'a, Iface, Meta>(
         &'a self,
-        pred: P,
+        pred: impl Fn(&Meta) -> bool + 'a,
     ) -> Box<dyn Iterator<Item = TypecastBuilder<'a, Iface>> + 'a>
     where
         Iface: 'static + ?Sized,
         Meta: 'static,
-        P: Fn(&Meta) -> bool,
-        P: 'a,
     {
         let iface_type = IfaceTypeId(TypeId::of::<Iface>());
         let bindings = self.0.bindings.get_vec(&iface_type);

@@ -93,7 +93,7 @@ fn test_metadata() {
 
     // Check helper methods
     let mut res = cat
-        .builders_for_with_meta::<dyn EventHandler, _, _>(|desc: &EventHandlerDesc| {
+        .builders_for_with_meta::<dyn EventHandler, _>(|desc: &EventHandlerDesc| {
             desc.event_type == "B"
         })
         .map(|b| b.instance_type_name())
@@ -116,7 +116,7 @@ fn test_metadata() {
         type ReturnType = Vec<std::sync::Arc<dyn EventHandler>>;
 
         fn get(cat: &dill::Catalog) -> Result<Self::ReturnType, dill::InjectionError> {
-            cat.builders_for_with_meta::<dyn EventHandler, _, _>(|desc: &EventHandlerDesc| {
+            cat.builders_for_with_meta::<dyn EventHandler, _>(|desc: &EventHandlerDesc| {
                 desc.event_type == "A"
             })
             .map(|b| b.get(cat))
