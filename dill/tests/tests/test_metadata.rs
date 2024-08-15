@@ -1,4 +1,4 @@
-use dill::Builder;
+use dill::{Builder, CatalogBuilder};
 
 #[test]
 fn test_metadata() {
@@ -137,4 +137,21 @@ fn test_metadata() {
 
     res.sort();
     assert_eq!(res, ["HandlerA: test", "HandlerAB: test"]);
+
+    let chained_cat = CatalogBuilder::new_chained(&cat).build();
+    let mut res = chained_cat
+        .builders_for_with_meta::<dyn EventHandler, _>(|desc: &EventHandlerDesc| {
+            desc.event_type == "B"
+        })
+        .map(|b| b.instance_type_name())
+        .collect::<Vec<_>>();
+
+    res.sort();
+    assert_eq!(
+        res,
+        [
+            "unit::tests::test_metadata::test_metadata::EventHandlerAB",
+            "unit::tests::test_metadata::test_metadata::EventHandlerB"
+        ]
+    );
 }

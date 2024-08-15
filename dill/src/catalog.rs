@@ -67,7 +67,7 @@ impl Catalog {
 
     pub fn builders_for_with_meta<'a, Iface, Meta>(
         &'a self,
-        pred: impl Fn(&Meta) -> bool + 'a,
+        pred: impl Fn(&Meta) -> bool + Copy + 'a,
     ) -> Box<dyn Iterator<Item = TypecastBuilder<'a, Iface>> + 'a>
     where
         Iface: 'static + ?Sized,
@@ -77,10 +77,10 @@ impl Catalog {
         let bindings = self.0.bindings.get_vec(&iface_type);
 
         let it_bindings =
-            TypecastPredicateBuilderIterator::new(bindings, move |b| b.metadata_contains(&pred));
+            TypecastPredicateBuilderIterator::new(bindings, move |b| b.metadata_contains(pred));
 
         if let Some(chained_catalog) = &self.0.chained_catalog {
-            Box::new(it_bindings.chain(chained_catalog.builders_for::<Iface>()))
+            Box::new(it_bindings.chain(chained_catalog.builders_for_with_meta::<Iface, Meta>(pred)))
         } else {
             Box::new(it_bindings)
         }
