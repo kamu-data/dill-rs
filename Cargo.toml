@@ -5,7 +5,7 @@ default-members = ["dill-impl", "dill"]
 
 
 [workspace.package]
-version = "0.9.1"
+version = "0.9.2"
 edition = "2021"
 readme = "README.md"
 homepage = "https://github.com/sergiimk/dill-rs"
