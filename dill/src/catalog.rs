@@ -27,6 +27,14 @@ pub(crate) struct CatalogInner {
 }
 
 impl Catalog {
+    pub fn builder() -> CatalogBuilder {
+        CatalogBuilder::new()
+    }
+
+    pub fn builder_chained(&self) -> CatalogBuilder {
+        CatalogBuilder::new_chained(self)
+    }
+
     pub(crate) fn new(
         builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
         bindings: MultiMap<IfaceTypeId, Binding>,

@@ -1,0 +1,26 @@
+[package]
+name = "example-axum"
+publish = false
+version.workspace = true
+edition.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+documentation.workspace = true
+authors.workspace = true
+license.workspace = true
+keywords.workspace = true
+include.workspace = true
+
+[dependencies]
+dill = { path = "../../dill" }
+
+axum = { version = "0.7" }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+headers = { version = "0.4" }
+http = { version = "1" }
+tokio = { version = "1", features = ["rt-multi-thread", "signal"] }
+tower = { version = "0.5" }
+
+[lints]
+workspace = true

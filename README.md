@@ -56,7 +56,7 @@ impl B for BImpl {
 /////////////////////////////////////////
 
 // Register interfaces and bind them to implementations
-let cat = CatalogBuilder::new()
+let cat = Catalog::builder()
     .add::<AImpl>()
     .bind::<dyn A, AImpl>()
     .add::<BImpl>()

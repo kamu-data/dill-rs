@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["dill-impl", "dill"]
+members = ["dill-impl", "dill", "examples/axum"]
+default-members = ["dill-impl", "dill"]
 
 
 [workspace.package]
@@ -10,6 +11,7 @@ readme = "README.md"
 homepage = "https://github.com/sergiimk/dill-rs"
 repository = "https://github.com/sergiimk/dill-rs"
 documentation = "https://docs.rs/dill"
+categories = ["config", "development-tools"]
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MIT OR Apache-2.0"
 keywords = ["di", "ioc", "dependency-injection", "dependency-inversion"]

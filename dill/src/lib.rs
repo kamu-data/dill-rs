@@ -37,7 +37,7 @@
 //!     }
 //! }
 //!
-//! let catalog = CatalogBuilder::new()
+//! let catalog = Catalog::builder()
 //!   .add::<A>()
 //!   .add::<B>()
 //!   .build();
@@ -78,7 +78,7 @@
 //!     }
 //! }
 //!
-//! let catalog = CatalogBuilder::new()
+//! let catalog = Catalog::builder()
 //!   .add::<AImpl1>()
 //!   .bind::<dyn A, AImpl1>()
 //!   .add::<AImpl2>()
@@ -116,7 +116,7 @@
 //!     }
 //! }
 //!
-//! let cat = CatalogBuilder::new()
+//! let cat = Catalog::builder()
 //!     .add::<A>()
 //!     .add_value("foo".to_owned())
 //!     .build();
@@ -152,7 +152,7 @@
 //!     }
 //! }
 //!
-//! let cat = CatalogBuilder::new()
+//! let cat = Catalog::builder()
 //!     .add_builder(
 //!         ConnectionPool::builder()
 //!             .with_host("foo".to_owned())
