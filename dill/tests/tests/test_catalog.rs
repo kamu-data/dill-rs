@@ -199,3 +199,44 @@ fn test_chained_catalog_binds() {
     let inst_later_a = cat_later.get_one::<dyn A>().unwrap();
     assert_eq!(inst_later_a.test(), "aimpl::bimpl::foo");
 }
+
+#[cfg(feature = "tokio")]
+#[tokio::test]
+async fn test_catalog_scope() {
+    use std::assert_matches::assert_matches;
+
+    let cat1 = Catalog::builder().add_value(1i32).build();
+
+    let cat = cat1.clone();
+    let proof = cat
+        .scope(async move {
+            // Get value from the current scope
+            let l1_before = Catalog::current().get_one::<i32>().unwrap();
+            assert_eq!(*l1_before.as_ref(), 1);
+
+            // Nested scope with and additional registered value
+            let cat2 = cat1.builder_chained().add_value(String::from("2")).build();
+            let proof = cat2
+                .scope(async move {
+                    let l2 = Catalog::current().get_one::<String>().unwrap();
+                    assert_eq!(l2.as_str(), "2");
+                    l2
+                })
+                .await;
+
+            // Check the scope was restored to cat1
+            let l1_after = Catalog::current().get_one::<i32>().unwrap();
+            assert_eq!(*l1_after.as_ref(), 1);
+            assert_matches!(
+                Catalog::current().get_one::<String>(),
+                Err(InjectionError::Unregistered(_))
+            );
+
+            proof
+        })
+        .await;
+
+    // This check is to ensure that all lambdas were actually executed and not
+    // skipped
+    assert_eq!(proof.as_str(), "2");
+}

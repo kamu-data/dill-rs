@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- `Catalog::scope` and `Catalog::current` allow setting and accessing a "current" catalog in a task-local context
+  - Requires new `tokio` crate feature
+- `Lazy<T>` injection spec that delays the creation of a value until it's requested
+  - Can be used to delay initialization of expensive values that are rarely used
+  - Can be used in combination with `Catalog::scope` to inject values registered dynamically
+
 ## [0.9.3] - 2024-12-06
 ### Changed
 - Upgraded to `thiserror v2` dependency

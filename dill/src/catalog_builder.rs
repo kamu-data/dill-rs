@@ -97,7 +97,7 @@ impl CatalogBuilder {
         Fct: FnOnce() -> Impl + Send + Sync + 'static,
         Impl: Send + Sync + 'static,
     {
-        self.add_builder(Lazy::new(factory));
+        self.add_builder(LazyBuilder::new(factory));
         self
     }
 

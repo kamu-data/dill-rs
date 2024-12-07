@@ -12,7 +12,20 @@ keywords = { workspace = true }
 include = { workspace = true }
 edition = { workspace = true }
 
+
+[features]
+default = []
+tokio = ["dep:tokio"]
+
+
 [dependencies]
 dill-impl = { workspace = true }
 thiserror = "2"
 multimap = "0.10"
+
+# Optional
+tokio = { optional = true, version = "1", default-features = false }
+
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

@@ -235,27 +235,27 @@ where
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct Lazy<Fct, Impl>
+pub(crate) struct LazyBuilder<Fct, Impl>
 where
     Fct: FnOnce() -> Impl,
     Impl: 'static + Send + Sync,
 {
-    state: Mutex<LazyState<Fct, Impl>>,
+    state: Mutex<LazyBuilderState<Fct, Impl>>,
 }
 
-struct LazyState<Fct, Impl> {
+struct LazyBuilderState<Fct, Impl> {
     factory: Option<Fct>,
     instance: Option<Arc<Impl>>,
 }
 
-impl<Fct, Impl> Lazy<Fct, Impl>
+impl<Fct, Impl> LazyBuilder<Fct, Impl>
 where
     Fct: FnOnce() -> Impl,
     Impl: 'static + Send + Sync,
 {
     pub fn new(factory: Fct) -> Self {
         Self {
-            state: Mutex::new(LazyState {
+            state: Mutex::new(LazyBuilderState {
                 factory: Some(factory),
                 instance: None,
             }),
@@ -263,7 +263,7 @@ where
     }
 }
 
-impl<Fct, Impl> Builder for Lazy<Fct, Impl>
+impl<Fct, Impl> Builder for LazyBuilder<Fct, Impl>
 where
     Fct: FnOnce() -> Impl + Send + Sync,
     Impl: 'static + Send + Sync,
@@ -289,7 +289,7 @@ where
     }
 }
 
-impl<Fct, Impl> TypedBuilder<Impl> for Lazy<Fct, Impl>
+impl<Fct, Impl> TypedBuilder<Impl> for LazyBuilder<Fct, Impl>
 where
     Fct: FnOnce() -> Impl + Send + Sync,
     Impl: 'static + Send + Sync,

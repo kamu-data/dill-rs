@@ -282,3 +282,83 @@ fn test_maybe_derive() {
 
     assert_matches!(cat.get_one::<BImpl>().unwrap().maybe_a, Some(_));
 }
+
+#[test]
+fn test_lazy_simple() {
+    #[component]
+    #[derive(Debug)]
+    struct A;
+
+    impl A {
+        fn test(&self) -> String {
+            "A".into()
+        }
+    }
+
+    let cat = Catalog::builder().add::<A>().build();
+
+    let lazy_a = cat.get::<dill::specs::Lazy<OneOf<A>>>().unwrap();
+    let a = lazy_a.get().unwrap();
+    assert_eq!(a.test(), "A");
+}
+
+#[cfg(feature = "tokio")]
+#[tokio::test]
+async fn test_lazy_scoped() {
+    #[component]
+    #[derive(Debug)]
+    struct A;
+
+    impl A {
+        fn test(&self) -> String {
+            "A".into()
+        }
+    }
+
+    let cat = Catalog::builder().build();
+
+    let lazy_a = cat.get::<dill::specs::Lazy<OneOf<A>>>().unwrap();
+    assert_matches!(lazy_a.get(), Err(InjectionError::Unregistered(_)));
+
+    let cat2 = cat.builder_chained().add::<A>().build();
+
+    let test = cat2
+        .scope(async move {
+            let a = lazy_a.get().unwrap();
+            a.test()
+        })
+        .await;
+
+    assert_eq!(test, "A");
+}
+
+#[test]
+fn test_lazy_derive() {
+    #[component]
+    #[derive(Debug)]
+    struct A;
+
+    impl A {
+        fn test(&self) -> String {
+            "A".into()
+        }
+    }
+
+    #[component]
+    #[derive(Debug)]
+    struct B {
+        lazy_a: dill::Lazy<Arc<A>>,
+    }
+
+    impl B {
+        fn test(&self) -> String {
+            let a = self.lazy_a.get().unwrap();
+            a.test()
+        }
+    }
+
+    let cat = Catalog::builder().add::<A>().add::<B>().build();
+
+    let b = cat.get_one::<B>().unwrap();
+    assert_eq!(b.test(), "A");
+}

@@ -7,25 +7,26 @@ pub(crate) enum InjectionType {
     Reference { inner: syn::Type },
     Option { element: Box<InjectionType> },
     Vec { item: Box<InjectionType> },
+    Lazy { element: Box<InjectionType> },
     Value { typ: syn::Type },
 }
 
 pub(crate) fn deduce_injection_type(typ: &syn::Type) -> InjectionType {
-    if is_reference(typ) {
-        InjectionType::Reference {
-            inner: strip_reference(typ),
-        }
-    } else if is_smart_ptr(typ) {
-        InjectionType::Arc {
-            inner: strip_smart_ptr(typ),
-        }
-    } else if is_option(typ) {
+    if let Some(inner) = strip_reference(typ) {
+        InjectionType::Reference { inner }
+    } else if let Some(inner) = get_arc_element_type(typ) {
+        InjectionType::Arc { inner }
+    } else if let Some(elem_typ) = get_option_element_type(typ) {
         InjectionType::Option {
-            element: Box::new(deduce_injection_type(&get_option_element_type(typ))),
+            element: Box::new(deduce_injection_type(&elem_typ)),
         }
-    } else if is_vec(typ) {
+    } else if let Some(elem_typ) = get_vec_item_type(typ) {
         InjectionType::Vec {
-            item: Box::new(deduce_injection_type(&get_vec_item_type(typ))),
+            item: Box::new(deduce_injection_type(&elem_typ)),
+        }
+    } else if let Some(elem_typ) = get_lazy_element_type(typ) {
+        InjectionType::Lazy {
+            element: Box::new(deduce_injection_type(&elem_typ)),
         }
     } else {
         InjectionType::Value { typ: typ.clone() }
@@ -34,104 +35,91 @@ pub(crate) fn deduce_injection_type(typ: &syn::Type) -> InjectionType {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn is_reference(typ: &syn::Type) -> bool {
-    matches!(typ, syn::Type::Reference(_))
-}
-
-pub(crate) fn strip_reference(typ: &syn::Type) -> syn::Type {
+pub(crate) fn strip_reference(typ: &syn::Type) -> Option<syn::Type> {
     match typ {
-        syn::Type::Reference(r) => r.elem.as_ref().clone(),
-        _ => typ.clone(),
+        syn::Type::Reference(r) => Some(r.elem.as_ref().clone()),
+        _ => None,
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn is_smart_ptr(typ: &syn::Type) -> bool {
+pub(crate) fn get_arc_element_type(typ: &syn::Type) -> Option<syn::Type> {
     let syn::Type::Path(typepath) = typ else {
-        return false;
+        panic!("Expected a Type::Path");
     };
 
-    if typepath.qself.is_some() || typepath.path.segments.len() != 1 {
-        return false;
+    if typepath.qself.is_some() || typepath.path.segments.last().unwrap().ident != "Arc" {
+        return None;
     }
 
-    &typepath.path.segments[0].ident == "Arc"
-}
+    let syn::PathArguments::AngleBracketed(args) =
+        &typepath.path.segments.last().unwrap().arguments
+    else {
+        return None;
+    };
 
-pub(crate) fn strip_smart_ptr(typ: &syn::Type) -> syn::Type {
-    match typ {
-        syn::Type::Path(typepath) if typepath.qself.is_none() => {
-            match typepath.path.segments.first() {
-                Some(seg) if &seg.ident == "Arc" => match seg.arguments {
-                    syn::PathArguments::AngleBracketed(ref args) => {
-                        syn::parse2(args.args.to_token_stream()).unwrap()
-                    }
-                    _ => typ.clone(),
-                },
-                _ => typ.clone(),
-            }
-        }
-        _ => typ.clone(),
-    }
+    Some(syn::parse2(args.args.to_token_stream()).unwrap())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn is_option(typ: &syn::Type) -> bool {
+pub(crate) fn get_option_element_type(typ: &syn::Type) -> Option<syn::Type> {
     let syn::Type::Path(typepath) = typ else {
-        return false;
+        panic!("Expected a Type::Path");
     };
 
-    if typepath.qself.is_some() || typepath.path.segments.len() != 1 {
-        return false;
+    if typepath.qself.is_some() || &typepath.path.segments.last().unwrap().ident != "Option" {
+        return None;
     }
 
-    &typepath.path.segments[0].ident == "Option"
-}
-
-pub(crate) fn get_option_element_type(typ: &syn::Type) -> syn::Type {
-    let syn::Type::Path(typepath) = typ else {
-        panic!("Type is not an Option")
+    let syn::PathArguments::AngleBracketed(args) =
+        &typepath.path.segments.last().unwrap().arguments
+    else {
+        return None;
     };
 
-    assert!(typepath.qself.is_none());
-    assert_eq!(typepath.path.segments.len(), 1);
-    assert_eq!(&typepath.path.segments[0].ident, "Option");
-
-    let syn::PathArguments::AngleBracketed(args) = &typepath.path.segments[0].arguments else {
-        panic!("No generic type specifier found in Option")
-    };
-    syn::parse2(args.args.to_token_stream()).unwrap()
+    Some(syn::parse2(args.args.to_token_stream()).unwrap())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn is_vec(typ: &syn::Type) -> bool {
+pub(crate) fn get_lazy_element_type(typ: &syn::Type) -> Option<syn::Type> {
     let syn::Type::Path(typepath) = typ else {
-        return false;
+        panic!("Expected a Type::Path");
     };
 
-    if typepath.qself.is_some() || typepath.path.segments.len() != 1 {
-        return false;
+    if typepath.qself.is_some() || &typepath.path.segments.last().unwrap().ident != "Lazy" {
+        return None;
     }
 
-    &typepath.path.segments[0].ident == "Vec"
+    let syn::PathArguments::AngleBracketed(args) =
+        &typepath.path.segments.last().unwrap().arguments
+    else {
+        return None;
+    };
+
+    Some(syn::parse2(args.args.to_token_stream()).unwrap())
 }
 
-pub(crate) fn get_vec_item_type(typ: &syn::Type) -> syn::Type {
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn get_vec_item_type(typ: &syn::Type) -> Option<syn::Type> {
     let syn::Type::Path(typepath) = typ else {
-        panic!("Type is not a Vec")
+        panic!("Expected a Type::Path");
     };
 
-    assert!(typepath.qself.is_none());
-    assert_eq!(typepath.path.segments.len(), 1);
-    assert_eq!(&typepath.path.segments[0].ident, "Vec");
+    if typepath.qself.is_some() || typepath.path.segments.last().unwrap().ident != "Vec" {
+        return None;
+    }
 
-    let syn::PathArguments::AngleBracketed(args) = &typepath.path.segments[0].arguments else {
-        panic!("No generic type specifier found in Vec")
+    let syn::PathArguments::AngleBracketed(args) =
+        &typepath.path.segments.last().unwrap().arguments
+    else {
+        return None;
     };
-    syn::parse2(args.args.to_token_stream()).unwrap()
+
+    Some(syn::parse2(args.args.to_token_stream()).unwrap())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

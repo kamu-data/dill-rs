@@ -164,25 +164,21 @@
 //! assert_eq!(inst.url(), "http://foo:8080");
 //! ```
 
-pub use dill_impl::*;
-
 mod builder;
-pub use builder::*;
-
-mod catalog_builder;
-pub use catalog_builder::*;
-
 mod catalog;
-pub use catalog::*;
-
+mod catalog_builder;
 mod errors;
-pub use errors::*;
-
-mod specs;
-pub use specs::*;
-
+mod lazy;
 mod scopes;
-pub use scopes::*;
-
+pub mod specs;
 mod typecast_builder;
+
+pub use builder::*;
+pub use catalog::*;
+pub use catalog_builder::*;
+pub use dill_impl::*;
+pub use errors::*;
+pub use lazy::Lazy;
+pub use scopes::*;
+pub use specs::*;
 pub use typecast_builder::*;
