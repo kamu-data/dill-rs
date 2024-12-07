@@ -108,4 +108,72 @@ impl Catalog {
     {
         OneOf::<Iface>::get(self)
     }
+
+    /// Sets this catalog as "current" in the async task scope for the duration
+    /// of the provided coroutine.
+    ///
+    /// Most useful when used in combination with [`crate::lazy::Lazy`] and
+    /// [`Self::builder_chained()`] for dynamically registering additional
+    /// types.
+    ///
+    /// Scopes can be nested - at the end of the inner scope the catalog from an
+    /// outer scope will be restored as "current".
+    ///
+    /// ### Examples
+    ///
+    /// ```
+    /// use dill::*;
+    /// use tokio::runtime::Runtime;
+    ///
+    /// Runtime::new().unwrap().block_on(async {
+    ///     let cat = Catalog::builder().add_value(String::from("test")).build();
+    ///
+    ///     cat.scope(async move {
+    ///         let val = Catalog::current().get_one::<String>().unwrap();
+    ///         assert_eq!(val.as_str(), "test");
+    ///     }).await;
+    /// })
+    /// ```
+    #[cfg(feature = "tokio")]
+    pub async fn scope<F, R>(&self, f: F) -> R
+    where
+        F: std::future::Future<Output = R>,
+    {
+        CURRENT_CATALOG.scope(self.clone(), f).await
+    }
+
+    /// Allows accessing the catalog in the current [`Self::scope`].
+    ///
+    /// Note that you should very rarely be using this method directly if at
+    /// all. Instead you should rely on [`crate::lazy::Lazy`] for
+    /// delayed injection from a current catalog.
+    ///
+    /// ### Panics
+    ///
+    /// Will panic if called from the outside of a [`Self::scope`].
+    ///
+    /// ### Examples
+    ///
+    /// ```
+    /// use dill::*;
+    /// use tokio::runtime::Runtime;
+    ///
+    /// Runtime::new().unwrap().block_on(async {
+    ///     let cat = Catalog::builder().add_value(String::from("test")).build();
+    ///
+    ///     cat.scope(async move {
+    ///         let val = Catalog::current().get_one::<String>().unwrap();
+    ///         assert_eq!(val.as_str(), "test");
+    ///     }).await;
+    /// })
+    /// ```
+    #[cfg(feature = "tokio")]
+    pub fn current() -> Catalog {
+        CURRENT_CATALOG.get()
+    }
+}
+
+#[cfg(feature = "tokio")]
+tokio::task_local! {
+    pub(crate) static CURRENT_CATALOG: Catalog;
 }
