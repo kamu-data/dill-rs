@@ -130,3 +130,42 @@ impl<Inner: DependencySpec> DependencySpec for Maybe<Inner> {
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Lazy
+/////////////////////////////////////////////////////////////////////////////////////////
+
+/// Delays the instantiation of a component untill explicitly requested.
+///
+/// See [`crate::lazy::Lazy`] documentation for details.
+pub struct Lazy<Inner: DependencySpec> {
+    _dummy: PhantomData<Inner>,
+}
+
+impl<Inner: DependencySpec> DependencySpec for Lazy<Inner> {
+    type ReturnType = crate::lazy::Lazy<Inner::ReturnType>;
+
+    #[cfg(not(feature = "tokio"))]
+    fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError> {
+        let cat = cat.clone();
+        Ok(crate::lazy::Lazy::new(move || Inner::get(&cat)))
+    }
+
+    #[cfg(feature = "tokio")]
+    fn get(cat: &Catalog) -> Result<Self::ReturnType, InjectionError> {
+        // Lazy<T> will store the clone of a catalog it was initially created with
+        // It will however first attempt to resolve a current catalog if scope feature
+        // is used and only use the former as a fallback.
+        let fallback_cat = cat.clone();
+        Ok(crate::lazy::Lazy::new(move || match crate::CURRENT_CATALOG
+            .try_with(|cat| Inner::get(cat))
+        {
+            Ok(v) => v,
+            Err(_) => Inner::get(&fallback_cat),
+        }))
+    }
+
+    fn check(cat: &Catalog) -> Result<(), InjectionError> {
+        Inner::check(cat)
+    }
+}

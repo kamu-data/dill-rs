@@ -185,6 +185,7 @@ dependencies = [
  "dill-impl",
  "multimap",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

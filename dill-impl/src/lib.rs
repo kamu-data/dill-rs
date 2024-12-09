@@ -362,6 +362,12 @@ fn implement_arg(
             }
             _ => unimplemented!("Currently only Option<Arc<Iface>> is supported"),
         },
+        InjectionType::Lazy { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::check(cat) }
+            }
+            _ => unimplemented!("Currently only Option<Arc<Iface>> is supported"),
+        },
         InjectionType::Vec { item } => match item.as_ref() {
             InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::check(cat) },
             _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
@@ -386,6 +392,12 @@ fn implement_arg(
                 quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::get(cat)? }
             }
             _ => unimplemented!("Currently only Option<Arc<Iface>> is supported"),
+        },
+        InjectionType::Lazy { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::get(cat)? }
+            }
+            _ => unimplemented!("Currently only Lazy<Arc<Iface>> is supported"),
         },
         InjectionType::Vec { item } => match item.as_ref() {
             InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::get(cat)? },

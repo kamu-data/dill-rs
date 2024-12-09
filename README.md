@@ -73,7 +73,8 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - Injection specs:
   - `OneOf` - expects a single implementation of a given interface
   - `AllOf` - returns a collection of all implementations on a given interface
-  - `Maybe<Spec>` - Returns `None` if inner `Spec` cannot be resolved
+  - `Maybe<Spec>` - returns `None` if inner `Spec` cannot be resolved
+  - `Lazy<Spec>` - injects an object that delays the creation of value until it is requested
 - Component scopes:
   - `Transient` (default) - a new instance is created for every invocation
   - `Singleton` - an instance is created upon first use and then reused for the rest of calls
@@ -89,6 +90,7 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - By value injection of `Clone` types
 - `Catalog` can be self-injected
 - Chaining of `Catalog`s allows adding values dynamically (e.g. in middleware chains like `tower`)
+- `Catalog` can be scoped within a `tokio` task as "current" to override the source of `Lazy`ly injected values
 
 
 # Design Principles
@@ -127,7 +129,6 @@ assert_eq!(inst.test(), "aimpl::bimpl");
   - task
   - catalog?
 - thread safety
-- lazy values
 - externally defined types
 - custom builders
 - error handling
