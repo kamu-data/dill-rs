@@ -16,6 +16,6 @@ jobs:
       - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
         with:
           components: rustfmt
-      - run: cargo build --workspace
+      - run: cargo build --workspace --all-features
       - run: cargo fmt --check
-      - run: cargo test --verbose --workspace
+      - run: cargo test --verbose --workspace --all-features

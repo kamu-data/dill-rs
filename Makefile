@@ -6,7 +6,7 @@
 lint:
 	cargo fmt --check
 	# cargo udeps --all-targets
-	cargo clippy --workspace --all-targets -- -D warnings
+	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 
 ###############################################################################
@@ -15,7 +15,7 @@ lint:
 
 .PHONY: lint-fix
 lint-fix:
-	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged --broken-code
+	cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged --broken-code
 	cargo fmt --all
 
 ###############################################################################
@@ -24,4 +24,4 @@ lint-fix:
 
 .PHONY: test
 test:
-	cargo test --verbose --workspace
+	cargo test --verbose --workspace --all-features
