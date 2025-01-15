@@ -47,7 +47,7 @@ impl Catalog {
         }))
     }
 
-    pub fn builders<'a>(&'a self) -> Box<dyn Iterator<Item = &dyn Builder> + 'a> {
+    pub fn builders<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Builder> + 'a> {
         let it_builders = self.0.builders.values().map(|b| b.as_ref());
         if let Some(chained_catalog) = &self.0.chained_catalog {
             Box::new(it_builders.chain(chained_catalog.builders()))

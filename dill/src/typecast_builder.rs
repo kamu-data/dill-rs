@@ -29,7 +29,7 @@ where
     caster: &'a TypeCaster<Iface>,
 }
 
-impl<'a, Iface> Builder for TypecastBuilder<'a, Iface>
+impl<Iface> Builder for TypecastBuilder<'_, Iface>
 where
     Iface: 'static + ?Sized,
 {
