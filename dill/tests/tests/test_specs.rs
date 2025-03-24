@@ -268,19 +268,25 @@ fn test_maybe_derive() {
     #[derive(Debug)]
     struct BImpl {
         maybe_a: Option<Arc<dyn A>>,
+        maybe_val: Option<i32>,
     }
 
     let cat = CatalogBuilder::new().add::<BImpl>().build();
 
-    assert_matches!(cat.get_one::<BImpl>().unwrap().maybe_a, None);
+    let inst = cat.get_one::<BImpl>().unwrap();
+    assert_matches!(inst.maybe_a, None);
+    assert_matches!(inst.maybe_val, None);
 
     let cat = CatalogBuilder::new()
         .add::<BImpl>()
         .add::<AImpl>()
         .bind::<dyn A, AImpl>()
+        .add_value(42i32)
         .build();
 
-    assert_matches!(cat.get_one::<BImpl>().unwrap().maybe_a, Some(_));
+    let inst = cat.get_one::<BImpl>().unwrap();
+    assert_matches!(inst.maybe_a, Some(_));
+    assert_matches!(inst.maybe_val, Some(42));
 }
 
 #[test]

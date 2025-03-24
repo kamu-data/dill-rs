@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- `#[component(explicit)]` attribute allows to specify fields that must be passed during the builder construction instead of being injected.
+- `TypedBuilderCast` trait allows to cast `TypedBuilder<T>` into `TypedBuilder<dyn I>` if `T` implements trait `I`.
+- New `eaxmples/cli` example showcasing builder casting and explicit fields.
+- Supported `Option<ByValue>` injection.
+### Changed
+- `Builder::get` was renamed to `Builder::get_any` to avoid the ambiguity between it and `TypedBuilder::get`.
+
 ## [0.11.0] - 2025-01-15
 ### Changed
 - Upgraded to latest nightly Rust compiler and deps

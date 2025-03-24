@@ -44,10 +44,22 @@ pub fn meta(_args: TokenStream, item: TokenStream) -> TokenStream {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
+fn component_from_struct(mut ast: syn::ItemStruct) -> TokenStream {
     let impl_name = &ast.ident;
     let impl_type = syn::parse2(quote! { #impl_name }).unwrap();
     let impl_generics = syn::parse2(quote! {}).unwrap();
+
+    let explicit_args: Vec<_> = ast
+        .fields
+        .iter_mut()
+        .filter_map(|f| {
+            if extract_attr_explicit(&mut f.attrs) {
+                Some((f.ident.clone().unwrap(), f.ty.clone()))
+            } else {
+                None
+            }
+        })
+        .collect();
 
     let args: Vec<_> = ast
         .fields
@@ -70,6 +82,7 @@ fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
         interfaces,
         meta,
         args,
+        explicit_args,
         false,
     );
 
@@ -79,13 +92,35 @@ fn component_from_struct(ast: syn::ItemStruct) -> TokenStream {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream {
+fn component_from_impl(vis: syn::Visibility, mut ast: syn::ItemImpl) -> TokenStream {
     let impl_generics = &ast.generics;
     let impl_type = &ast.self_ty;
-    let new = get_new(&ast.items).expect(
+    let new = get_new(&mut ast.items).expect(
         "When using #[component] macro on the impl block it's expected to contain a new() \
          function. Otherwise use #[derive(Builder)] on the struct.",
     );
+
+    let explicit_args: Vec<_> = new
+        .sig
+        .inputs
+        .iter_mut()
+        .filter_map(|f| match f {
+            syn::FnArg::Receiver(_) => None,
+            syn::FnArg::Typed(f) => {
+                if extract_attr_explicit(&mut f.attrs) {
+                    Some((
+                        match f.pat.as_ref() {
+                            syn::Pat::Ident(ident) => ident.ident.clone(),
+                            _ => panic!("Unexpected format of arguments in new() function"),
+                        },
+                        f.ty.as_ref().clone(),
+                    ))
+                } else {
+                    None
+                }
+            }
+        })
+        .collect();
 
     let args: Vec<_> = new
         .sig
@@ -121,6 +156,7 @@ fn component_from_impl(vis: syn::Visibility, ast: syn::ItemImpl) -> TokenStream 
         interfaces,
         meta,
         args,
+        explicit_args,
         true,
     );
 
@@ -139,6 +175,7 @@ fn implement_builder(
     interfaces: Vec<syn::Type>,
     meta: Vec<syn::ExprStruct>,
     args: Vec<(syn::Ident, syn::Type)>,
+    explicit_args: Vec<(syn::Ident, syn::Type)>,
     has_new: bool,
 ) -> TokenStream {
     let builder_name = format_ident!("{}Builder", quote! { #impl_type }.to_string());
@@ -181,6 +218,18 @@ fn implement_builder(
         arg_check_dependency.push(check_dependency);
     }
 
+    let explicit_arg: Vec<_> = explicit_args
+        .iter()
+        .map(|(ident, ty)| quote! { #ident: #ty })
+        .collect();
+    let explicit_arg_set: Vec<_> = explicit_args
+        .iter()
+        .map(|(ident, _)| {
+            let setter_val_name = format_ident!("with_{}", ident);
+            quote! { .#setter_val_name(#ident) }
+        })
+        .collect();
+
     let ctor = if !has_new {
         quote! {
             #impl_type {
@@ -193,23 +242,40 @@ fn implement_builder(
         }
     };
 
-    let gen = quote! {
-        impl ::dill::Component for #impl_type {
-            type Builder = #builder_name;
+    let component_or_explicit_factory = if explicit_args.is_empty() {
+        quote! {
+            impl ::dill::Component for #impl_type {
+                type Builder = #builder_name;
 
-            fn register(cat: &mut ::dill::CatalogBuilder) {
-                cat.add_builder(Self::builder());
+                fn register(cat: &mut ::dill::CatalogBuilder) {
+                    cat.add_builder(Self::builder());
 
-                #(
-                    cat.bind::<#interfaces, #impl_type>();
-                )*
-            }
+                    #(
+                        cat.bind::<#interfaces, #impl_type>();
+                    )*
+                }
 
-            fn builder() -> Self::Builder {
-                #builder_name::new()
+                fn builder() -> Self::Builder {
+                    #builder_name::new()
+                }
             }
         }
+    } else {
+        quote! {
+            impl #impl_type {
+                pub fn builder(
+                    #(#explicit_arg),*
+                ) -> #builder_name {
+                    #builder_name::new()
+                    #(
+                        #explicit_arg_set
+                    )*
+                }
+            }
+        }
+    };
 
+    let builder = quote! {
         #impl_vis struct #builder_name {
             scope: #scope_type,
             #(
@@ -260,7 +326,7 @@ fn implement_builder(
                 #( #meta_provide )*
             }
 
-            fn get(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<dyn ::std::any::Any + Send + Sync>, ::dill::InjectionError> {
+            fn get_any(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<dyn ::std::any::Any + Send + Sync>, ::dill::InjectionError> {
                 Ok(::dill::TypedBuilder::get(self, cat)?)
             }
 
@@ -295,9 +361,56 @@ fn implement_builder(
                 Ok(inst)
             }
         }
+
+        #(
+            // Allows casting TypedBuider<T> into TypedBuilder<dyn I> for all declared interfaces
+            impl ::dill::TypedBuilderCast<#interfaces> for #builder_name
+            {
+                fn cast(self) -> impl ::dill::TypedBuilder<#interfaces> {
+                    struct B(#builder_name);
+
+                    impl ::dill::Builder for B {
+                        fn instance_type_id(&self) -> ::std::any::TypeId {
+                            self.0.instance_type_id()
+                        }
+                        fn instance_type_name(&self) -> &'static str {
+                            self.0.instance_type_name()
+                        }
+                        fn interfaces(&self, clb: &mut dyn FnMut(&::dill::InterfaceDesc) -> bool) {
+                            self.0.interfaces(clb)
+                        }
+                        fn metadata<'a>(&'a self, clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {
+                            self.0.metadata(clb)
+                        }
+                        fn get_any(&self, cat: &::dill::Catalog) -> Result<std::sync::Arc<dyn std::any::Any + Send + Sync>, ::dill::InjectionError> {
+                            self.0.get_any(cat)
+                        }
+                        fn check(&self, cat: &::dill::Catalog) -> Result<(), ::dill::ValidationError> {
+                            self.0.check(cat)
+                        }
+                    }
+
+                    impl ::dill::TypedBuilder<#interfaces> for B {
+                        fn get(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<#interfaces>, ::dill::InjectionError> {
+                            match self.0.get(cat) {
+                                Ok(v) => Ok(v),
+                                Err(e) => Err(e),
+                            }
+                        }
+                    }
+
+                    B(self)
+                }
+            }
+        )*
     };
 
-    gen.into()
+    quote! {
+        #component_or_explicit_factory
+
+        #builder
+    }
+    .into()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -353,27 +466,7 @@ fn implement_arg(
     };
 
     // TODO: Make these rules recursive
-    let do_check_dependency = match &injection_type {
-        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
-        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
-        InjectionType::Option { element } => match element.as_ref() {
-            InjectionType::Arc { inner } => {
-                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::check(cat) }
-            }
-            _ => unimplemented!("Currently only Option<Arc<Iface>> is supported"),
-        },
-        InjectionType::Lazy { element } => match element.as_ref() {
-            InjectionType::Arc { inner } => {
-                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::check(cat) }
-            }
-            _ => unimplemented!("Currently only Option<Arc<Iface>> is supported"),
-        },
-        InjectionType::Vec { item } => match item.as_ref() {
-            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::check(cat) },
-            _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
-        },
-        InjectionType::Value { typ } => quote! { ::dill::OneOf::<#typ>::check(cat) },
-    };
+    let do_check_dependency = get_do_check_dependency(&injection_type);
     let check_dependency = match &injection_type {
         InjectionType::Reference { .. } => quote! { #do_check_dependency },
         _ => quote! {
@@ -384,36 +477,13 @@ fn implement_arg(
         },
     };
 
-    let from_catalog = match &injection_type {
-        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::get(cat)? },
-        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::get(cat)? },
-        InjectionType::Option { element } => match element.as_ref() {
-            InjectionType::Arc { inner } => {
-                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::get(cat)? }
-            }
-            _ => unimplemented!("Currently only Option<Arc<Iface>> is supported"),
-        },
-        InjectionType::Lazy { element } => match element.as_ref() {
-            InjectionType::Arc { inner } => {
-                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::get(cat)? }
-            }
-            _ => unimplemented!("Currently only Lazy<Arc<Iface>> is supported"),
-        },
-        InjectionType::Vec { item } => match item.as_ref() {
-            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::get(cat)? },
-            _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
-        },
-        InjectionType::Value { typ } => {
-            quote! { ::dill::OneOf::<#typ>::get(cat).map(|v| v.as_ref().clone())? }
-        }
-    };
-
+    let do_get_dependency = get_do_get_dependency(&injection_type);
     let prepare_dependency = match &injection_type {
-        InjectionType::Reference { .. } => quote! { let #name = #from_catalog; },
+        InjectionType::Reference { .. } => quote! { let #name = #do_get_dependency; },
         _ => quote! {
             let #name = match &self.#override_fn_name {
                 Some(fun) => fun(cat)?,
-                _ => #from_catalog,
+                _ => #do_get_dependency,
             };
         },
     };
@@ -431,6 +501,68 @@ fn implement_arg(
         provide_dependency,
         check_dependency,
     )
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn get_do_check_dependency(injection_type: &InjectionType) -> proc_macro2::TokenStream {
+    match injection_type {
+        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
+        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
+        InjectionType::Option { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::check(cat) }
+            }
+            InjectionType::Value { typ } => {
+                quote! { ::dill::Maybe::<::dill::OneOf::<#typ>>::check(cat) }
+            }
+            _ => {
+                unimplemented!("Currently only Option<Arc<Iface>> and Option<Value> are supported")
+            }
+        },
+        InjectionType::Lazy { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::check(cat) }
+            }
+            _ => unimplemented!("Currently only Lazy<Arc<Iface>> is supported"),
+        },
+        InjectionType::Vec { item } => match item.as_ref() {
+            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::check(cat) },
+            _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
+        },
+        InjectionType::Value { typ } => quote! { ::dill::OneOf::<#typ>::check(cat) },
+    }
+}
+
+fn get_do_get_dependency(injection_type: &InjectionType) -> proc_macro2::TokenStream {
+    match injection_type {
+        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::get(cat)? },
+        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::get(cat)? },
+        InjectionType::Option { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::get(cat)? }
+            }
+            InjectionType::Value { typ } => {
+                quote! { ::dill::Maybe::<::dill::OneOf::<#typ>>::get(cat)?.map(|v| v.as_ref().clone()) }
+            }
+            _ => {
+                unimplemented!("Currently only Option<Arc<Iface>> and Option<Value> are supported")
+            }
+        },
+        InjectionType::Lazy { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::get(cat)? }
+            }
+            _ => unimplemented!("Currently only Lazy<Arc<Iface>> is supported"),
+        },
+        InjectionType::Vec { item } => match item.as_ref() {
+            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::get(cat)? },
+            _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
+        },
+        InjectionType::Value { typ } => {
+            quote! { ::dill::OneOf::<#typ>::get(cat).map(|v| v.as_ref().clone())? }
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -519,12 +651,37 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Searches `impl` block for `new()` method
-fn get_new(impl_items: &[syn::ImplItem]) -> Option<&syn::ImplItemFn> {
+fn get_new(impl_items: &mut [syn::ImplItem]) -> Option<&mut syn::ImplItemFn> {
     impl_items
-        .iter()
+        .iter_mut()
         .filter_map(|i| match i {
             syn::ImplItem::Fn(m) => Some(m),
             _ => None,
         })
         .find(|m| m.sig.ident == "new")
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn extract_attr_explicit(attrs: &mut Vec<syn::Attribute>) -> bool {
+    let mut present = false;
+    attrs.retain_mut(|attr| {
+        if is_attr_explicit(attr) {
+            present = true;
+            false
+        } else {
+            true
+        }
+    });
+    present
+}
+
+fn is_attr_explicit(attr: &syn::Attribute) -> bool {
+    if !is_dill_attr(attr, "component") {
+        return false;
+    }
+    let syn::Meta::List(meta) = &attr.meta else {
+        return false;
+    };
+    meta.tokens.to_string().contains("explicit")
 }

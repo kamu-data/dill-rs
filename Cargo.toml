@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["dill-impl", "dill", "examples/axum"]
+members = ["dill-impl", "dill", "examples/axum", "examples/cli"]
 default-members = ["dill-impl", "dill"]
 
 

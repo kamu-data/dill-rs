@@ -27,7 +27,7 @@ pub trait Builder: Send + Sync {
     fn metadata<'a>(&'a self, clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool);
 
     /// Get an instance of the supplied type
-    fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError>;
+    fn get_any(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError>;
 
     /// Validate the dependency tree
     fn check(&self, cat: &Catalog) -> Result<(), ValidationError>;
@@ -140,8 +140,12 @@ impl<T: Builder + ?Sized> BuilderExt for T {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait TypedBuilder<T: Send + Sync>: Builder {
+pub trait TypedBuilder<T: Send + Sync + ?Sized>: Builder {
     fn get(&self, cat: &Catalog) -> Result<Arc<T>, InjectionError>;
+}
+
+pub trait TypedBuilderCast<I: Send + Sync + ?Sized> {
+    fn cast(self) -> impl TypedBuilder<I>;
 }
 
 /// Allows [CatalogBuilder::add()] to accept types with associated builder
@@ -176,7 +180,7 @@ where
 
     fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
 
-    fn get(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+    fn get_any(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self.clone())
     }
 
@@ -214,7 +218,7 @@ where
 
     fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
 
-    fn get(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+    fn get_any(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self())
     }
 
@@ -280,7 +284,7 @@ where
 
     fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
 
-    fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+    fn get_any(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(TypedBuilder::get(self, cat)?)
     }
 

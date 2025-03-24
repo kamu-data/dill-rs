@@ -49,8 +49,8 @@ where
         self.builder.metadata(clb)
     }
 
-    fn get(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
-        self.builder.get(cat)
+    fn get_any(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+        self.builder.get_any(cat)
     }
 
     fn check(&self, cat: &Catalog) -> Result<(), ValidationError> {
@@ -67,7 +67,7 @@ where
     }
 
     pub fn get(&self, cat: &Catalog) -> Result<Arc<Iface>, InjectionError> {
-        let inst = self.builder.get(cat)?;
+        let inst = self.builder.get_any(cat)?;
         Ok((self.caster.cast_arc)(inst))
     }
 }

@@ -24,4 +24,4 @@ lint-fix:
 
 .PHONY: test
 test:
-	cargo test --verbose --workspace --all-features
+	cargo test --workspace --all-features
