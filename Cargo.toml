@@ -5,7 +5,7 @@ default-members = ["dill-impl", "dill"]
 
 
 [workspace.package]
-version = "0.11.0"
+version = "0.12.0"
 edition = "2021"
 readme = "README.md"
 homepage = "https://github.com/sergiimk/dill-rs"
@@ -54,4 +54,4 @@ multiple_crate_versions = { level = "allow", priority = 1 }
 
 
 [workspace.dependencies]
-dill-impl = { path = "dill-impl", version = "0.11.0" }
+dill-impl = { path = "dill-impl", version = "0.12.0" }

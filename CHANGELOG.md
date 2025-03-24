@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.12.0] - 2025-03-24
 ### Added
 - `#[component(explicit)]` attribute allows to specify fields that must be passed during the builder construction instead of being injected.
 - `TypedBuilderCast` trait allows to cast `TypedBuilder<T>` into `TypedBuilder<dyn I>` if `T` implements trait `I`.
