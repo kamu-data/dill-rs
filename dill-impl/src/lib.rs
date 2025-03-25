@@ -245,7 +245,7 @@ fn implement_builder(
 
     let builder = quote! {
         #impl_vis struct #builder_name {
-            scope: #scope_type,
+            dill_builder_scope: #scope_type,
             #(#arg_override_fn_field),*
         }
 
@@ -256,7 +256,7 @@ fn implement_builder(
                 #(#explicit_arg_decl),*
             ) -> Self {
                 Self {
-                    scope: #scope_type::new(),
+                    dill_builder_scope: #scope_type::new(),
                     #(#arg_override_fn_field_ctor),*
                 }
             }
@@ -317,13 +317,13 @@ fn implement_builder(
             fn get(&self, cat: &::dill::Catalog) -> Result<std::sync::Arc<#impl_type>, ::dill::InjectionError> {
                 use ::dill::Scope;
 
-                if let Some(inst) = self.scope.get() {
+                if let Some(inst) = self.dill_builder_scope.get() {
                     return Ok(inst.downcast().unwrap());
                 }
 
                 let inst = ::std::sync::Arc::new(self.build(cat)?);
 
-                self.scope.set(inst.clone());
+                self.dill_builder_scope.set(inst.clone());
                 Ok(inst)
             }
         }
