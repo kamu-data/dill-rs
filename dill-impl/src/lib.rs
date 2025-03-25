@@ -49,22 +49,16 @@ fn component_from_struct(mut ast: syn::ItemStruct) -> TokenStream {
     let impl_type = syn::parse2(quote! { #impl_name }).unwrap();
     let impl_generics = syn::parse2(quote! {}).unwrap();
 
-    let explicit_args: Vec<_> = ast
-        .fields
-        .iter_mut()
-        .filter_map(|f| {
-            if extract_attr_explicit(&mut f.attrs) {
-                Some((f.ident.clone().unwrap(), f.ty.clone()))
-            } else {
-                None
-            }
-        })
-        .collect();
-
     let args: Vec<_> = ast
         .fields
-        .iter()
-        .map(|f| (f.ident.clone().unwrap(), f.ty.clone()))
+        .iter_mut()
+        .map(|f| {
+            (
+                f.ident.clone().unwrap(),
+                f.ty.clone(),
+                extract_attr_explicit(&mut f.attrs),
+            )
+        })
         .collect();
 
     let scope_type =
@@ -82,7 +76,6 @@ fn component_from_struct(mut ast: syn::ItemStruct) -> TokenStream {
         interfaces,
         meta,
         args,
-        explicit_args,
         false,
     );
 
@@ -100,32 +93,10 @@ fn component_from_impl(vis: syn::Visibility, mut ast: syn::ItemImpl) -> TokenStr
          function. Otherwise use #[derive(Builder)] on the struct.",
     );
 
-    let explicit_args: Vec<_> = new
-        .sig
-        .inputs
-        .iter_mut()
-        .filter_map(|f| match f {
-            syn::FnArg::Receiver(_) => None,
-            syn::FnArg::Typed(f) => {
-                if extract_attr_explicit(&mut f.attrs) {
-                    Some((
-                        match f.pat.as_ref() {
-                            syn::Pat::Ident(ident) => ident.ident.clone(),
-                            _ => panic!("Unexpected format of arguments in new() function"),
-                        },
-                        f.ty.as_ref().clone(),
-                    ))
-                } else {
-                    None
-                }
-            }
-        })
-        .collect();
-
     let args: Vec<_> = new
         .sig
         .inputs
-        .iter()
+        .iter_mut()
         .map(|arg| match arg {
             syn::FnArg::Typed(targ) => targ,
             _ => panic!("Unexpected argument in new() function"),
@@ -137,6 +108,7 @@ fn component_from_impl(vis: syn::Visibility, mut ast: syn::ItemImpl) -> TokenStr
                     _ => panic!("Unexpected format of arguments in new() function"),
                 },
                 arg.ty.as_ref().clone(),
+                extract_attr_explicit(&mut arg.attrs),
             )
         })
         .collect();
@@ -156,7 +128,6 @@ fn component_from_impl(vis: syn::Visibility, mut ast: syn::ItemImpl) -> TokenStr
         interfaces,
         meta,
         args,
-        explicit_args,
         true,
     );
 
@@ -174,13 +145,12 @@ fn implement_builder(
     scope_type: syn::Path,
     interfaces: Vec<syn::Type>,
     meta: Vec<syn::ExprStruct>,
-    args: Vec<(syn::Ident, syn::Type)>,
-    explicit_args: Vec<(syn::Ident, syn::Type)>,
+    args: Vec<(syn::Ident, syn::Type, bool)>,
     has_new: bool,
 ) -> TokenStream {
     let builder_name = format_ident!("{}Builder", quote! { #impl_type }.to_string());
 
-    let arg_name: Vec<_> = args.iter().map(|(name, _)| name).collect();
+    let arg_name: Vec<_> = args.iter().map(|(name, _, _)| name).collect();
 
     let meta_provide: Vec<_> = meta
         .iter()
@@ -200,7 +170,7 @@ fn implement_builder(
     let mut arg_provide_dependency = Vec::new();
     let mut arg_check_dependency = Vec::new();
 
-    for (name, typ) in &args {
+    for (name, typ, is_explicit) in &args {
         let (
             override_fn_field,
             override_fn_field_ctor,
@@ -208,7 +178,7 @@ fn implement_builder(
             prepare_dependency,
             provide_dependency,
             check_dependency,
-        ) = implement_arg(name, typ, &builder_name);
+        ) = implement_arg(name, typ, &builder_name, *is_explicit);
 
         arg_override_fn_field.push(override_fn_field);
         arg_override_fn_field_ctor.push(override_fn_field_ctor);
@@ -218,16 +188,15 @@ fn implement_builder(
         arg_check_dependency.push(check_dependency);
     }
 
-    let explicit_arg: Vec<_> = explicit_args
+    let explicit_arg_decl: Vec<_> = args
         .iter()
-        .map(|(ident, ty)| quote! { #ident: #ty })
+        .filter(|(_, _, is_explicit)| *is_explicit)
+        .map(|(ident, ty, _)| quote! { #ident: #ty })
         .collect();
-    let explicit_arg_set: Vec<_> = explicit_args
+    let explicit_arg_provide: Vec<_> = args
         .iter()
-        .map(|(ident, _)| {
-            let setter_val_name = format_ident!("with_{}", ident);
-            quote! { .#setter_val_name(#ident) }
-        })
+        .filter(|(_, _, is_explicit)| *is_explicit)
+        .map(|(ident, _, _)| quote! { #ident })
         .collect();
 
     let ctor = if !has_new {
@@ -242,7 +211,7 @@ fn implement_builder(
         }
     };
 
-    let component_or_explicit_factory = if explicit_args.is_empty() {
+    let component_or_explicit_factory = if explicit_arg_decl.is_empty() {
         quote! {
             impl ::dill::Component for #impl_type {
                 type Builder = #builder_name;
@@ -264,12 +233,11 @@ fn implement_builder(
         quote! {
             impl #impl_type {
                 pub fn builder(
-                    #(#explicit_arg),*
+                    #(#explicit_arg_decl),*
                 ) -> #builder_name {
-                    #builder_name::new()
-                    #(
-                        #explicit_arg_set
-                    )*
+                    #builder_name::new(
+                        #(#explicit_arg_provide),*
+                    )
                 }
             }
         }
@@ -278,20 +246,18 @@ fn implement_builder(
     let builder = quote! {
         #impl_vis struct #builder_name {
             scope: #scope_type,
-            #(
-                #arg_override_fn_field
-            )*
+            #(#arg_override_fn_field),*
         }
 
         impl #builder_name {
             #( #meta_vars )*
 
-            pub fn new() -> Self {
+            pub fn new(
+                #(#explicit_arg_decl),*
+            ) -> Self {
                 Self {
                     scope: #scope_type::new(),
-                    #(
-                        #arg_override_fn_field_ctor
-                    )*
+                    #(#arg_override_fn_field_ctor),*
                 }
             }
 
@@ -419,6 +385,7 @@ fn implement_arg(
     name: &syn::Ident,
     typ: &syn::Type,
     builder: &syn::Ident,
+    is_explicit: bool,
 ) -> (
     proc_macro2::TokenStream, // override_fn_field
     proc_macro2::TokenStream, // override_fn_field_ctor
@@ -429,68 +396,103 @@ fn implement_arg(
 ) {
     let override_fn_name = format_ident!("arg_{}_fn", name);
 
-    let injection_type = types::deduce_injection_type(typ);
-
-    let override_fn_field = match &injection_type {
-        InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
-        _ => quote! {
-            #override_fn_name: Option<Box<dyn Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + Send + Sync>>,
-        },
+    let injection_type = if is_explicit {
+        InjectionType::Value { typ: typ.clone() }
+    } else {
+        types::deduce_injection_type(typ)
     };
 
-    let override_fn_field_ctor = match &injection_type {
-        InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
-        _ => quote! { #override_fn_name: None, },
+    // Used to declare the field that stores the override factory function or
+    // an explicit argument
+    let override_fn_field = if is_explicit {
+        quote! { #name: #typ }
+    } else {
+        match &injection_type {
+            InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
+            _ => quote! {
+                #override_fn_name: Option<Box<dyn Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + Send + Sync>>
+            },
+        }
     };
 
-    let override_setters = match &injection_type {
-        InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
-        _ => {
-            let setter_val_name = format_ident!("with_{}", name);
-            let setter_fn_name = format_ident!("with_{}_fn", name);
-            quote! {
-                pub fn #setter_val_name(mut self, val: #typ) -> #builder {
-                    self.#override_fn_name = Some(Box::new(move |_| Ok(val.clone())));
-                    self
-                }
+    // Used initialize the field that stores the override factory function or
+    // an explicit argument
+    let override_fn_field_ctor = if is_explicit {
+        quote! { #name: #name }
+    } else {
+        match &injection_type {
+            InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
+            _ => quote! { #override_fn_name: None },
+        }
+    };
 
-                pub fn #setter_fn_name(
-                    mut self,
-                    fun: impl Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + 'static + Send + Sync
-                ) -> #builder {
-                    self.#override_fn_name = Some(Box::new(fun));
-                    self
+    // Used to create with_* and with_*_fn setters for dependency overrides
+    let override_setters = if is_explicit {
+        proc_macro2::TokenStream::new()
+    } else {
+        match &injection_type {
+            InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
+            _ => {
+                let setter_val_name = format_ident!("with_{}", name);
+                let setter_fn_name = format_ident!("with_{}_fn", name);
+                quote! {
+                    pub fn #setter_val_name(mut self, val: #typ) -> #builder {
+                        self.#override_fn_name = Some(Box::new(move |_| Ok(val.clone())));
+                        self
+                    }
+
+                    pub fn #setter_fn_name(
+                        mut self,
+                        fun: impl Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + 'static + Send + Sync
+                    ) -> #builder {
+                        self.#override_fn_name = Some(Box::new(fun));
+                        self
+                    }
                 }
             }
         }
     };
 
-    // TODO: Make these rules recursive
-    let do_check_dependency = get_do_check_dependency(&injection_type);
-    let check_dependency = match &injection_type {
-        InjectionType::Reference { .. } => quote! { #do_check_dependency },
-        _ => quote! {
-            match &self.#override_fn_name {
-                Some(_) => Ok(()),
-                _ => #do_check_dependency,
-            }
-        },
+    // Used in TBuilder::check() to validate the dependency
+    let check_dependency = if is_explicit {
+        quote! { Ok(()) }
+    } else {
+        let do_check_dependency = get_do_check_dependency(&injection_type);
+        match &injection_type {
+            InjectionType::Reference { .. } => quote! { #do_check_dependency },
+            _ => quote! {
+                match &self.#override_fn_name {
+                    Some(_) => Ok(()),
+                    _ => #do_check_dependency,
+                }
+            },
+        }
     };
 
-    let do_get_dependency = get_do_get_dependency(&injection_type);
-    let prepare_dependency = match &injection_type {
-        InjectionType::Reference { .. } => quote! { let #name = #do_get_dependency; },
-        _ => quote! {
-            let #name = match &self.#override_fn_name {
-                Some(fun) => fun(cat)?,
-                _ => #do_get_dependency,
-            };
-        },
+    // Used in TBuilder::build() to extract the dependency from the catalog
+    let prepare_dependency = if is_explicit {
+        proc_macro2::TokenStream::new()
+    } else {
+        let do_get_dependency = get_do_get_dependency(&injection_type);
+        match &injection_type {
+            InjectionType::Reference { .. } => quote! { let #name = #do_get_dependency; },
+            _ => quote! {
+                let #name = match &self.#override_fn_name {
+                    Some(fun) => fun(cat)?,
+                    _ => #do_get_dependency,
+                };
+            },
+        }
     };
 
-    let provide_dependency = match &injection_type {
-        InjectionType::Reference { .. } => quote! { #name.as_ref() },
-        _ => quote! { #name },
+    // Called to provide dependency value to T's constructor
+    let provide_dependency = if is_explicit {
+        quote! { self.#name.clone() }
+    } else {
+        match &injection_type {
+            InjectionType::Reference { .. } => quote! { #name.as_ref() },
+            _ => quote! { #name },
+        }
     };
 
     (
