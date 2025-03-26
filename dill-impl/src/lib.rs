@@ -188,6 +188,7 @@ fn implement_new(impl_type: &syn::Type, args: &[(syn::Ident, syn::Type, bool)]) 
 
     quote! {
         impl #impl_type {
+            #[allow(clippy::too_many_arguments)]
             pub fn new(
                 #(#arg_decl),*
             ) -> Self {
@@ -297,6 +298,7 @@ fn implement_builder(
     } else {
         quote! {
             impl #impl_type {
+                #[allow(clippy::too_many_arguments)]
                 pub fn builder(
                     #(#explicit_arg_decl),*
                 ) -> #builder_name {
