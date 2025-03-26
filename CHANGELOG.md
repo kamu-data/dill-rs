@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.3] - 2025-03-25
+### Changed
+- The `#[component]` macro will generate `new()` factory function when applied to a `struct`. This prevents the situations when `impl` with `new` function is added, but developer forgets to move `#[component]` decorator from `struct` to `impl`, which can lead to confusion.
+- The `#[component(no_new)]` attribute is added to skip generating `new` function.
+
 ## [0.12.2] - 2025-03-25
 ### Fixed
 - Rename private `Builder::scope` field to avoid collisions with user-defined arguments.

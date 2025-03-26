@@ -8,13 +8,52 @@ use types::InjectionType;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+struct ComponentParams {
+    vis: syn::Visibility,
+    no_new: bool,
+}
+
+impl syn::parse::Parse for ComponentParams {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        let mut params = ComponentParams {
+            vis: syn::Visibility::Inherited,
+            no_new: false,
+        };
+
+        while !input.is_empty() {
+            if input.peek(syn::Token![pub]) {
+                params.vis = input.parse()?;
+            } else {
+                let ident = input.parse::<syn::Ident>()?;
+                match ident.to_string().as_str() {
+                    "no_new" => params.no_new = true,
+                    s => {
+                        return Err(syn::Error::new(
+                            ident.span(),
+                            format!("Unexpected parameter: {s}"),
+                        ))
+                    }
+                }
+            }
+
+            if !input.is_empty() {
+                input.parse::<syn::Token![,]>()?; // Consume the comma
+            }
+        }
+        Ok(params)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let params = syn::parse_macro_input!(attr as ComponentParams);
+
     let ast: syn::Item = syn::parse(item).unwrap();
-    let vis: syn::Visibility = syn::parse(attr).unwrap();
     match ast {
-        syn::Item::Struct(struct_ast) => component_from_struct(struct_ast),
-        syn::Item::Impl(impl_ast) => component_from_impl(vis, impl_ast),
+        syn::Item::Struct(struct_ast) => component_from_struct(params, struct_ast),
+        syn::Item::Impl(impl_ast) => component_from_impl(params, impl_ast),
         _ => {
             panic!("The #[component] macro can only be used on struct definition or an impl block")
         }
@@ -44,7 +83,7 @@ pub fn meta(_args: TokenStream, item: TokenStream) -> TokenStream {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn component_from_struct(mut ast: syn::ItemStruct) -> TokenStream {
+fn component_from_struct(params: ComponentParams, mut ast: syn::ItemStruct) -> TokenStream {
     let impl_name = &ast.ident;
     let impl_type = syn::parse2(quote! { #impl_name }).unwrap();
     let impl_generics = syn::parse2(quote! {}).unwrap();
@@ -68,6 +107,11 @@ fn component_from_struct(mut ast: syn::ItemStruct) -> TokenStream {
     let meta = get_meta(&ast.attrs);
 
     let mut gen: TokenStream = quote! { #ast }.into();
+
+    if !params.no_new {
+        gen.extend(implement_new(&impl_type, &args));
+    }
+
     let builder: TokenStream = implement_builder(
         &ast.vis,
         &impl_type,
@@ -76,7 +120,7 @@ fn component_from_struct(mut ast: syn::ItemStruct) -> TokenStream {
         interfaces,
         meta,
         args,
-        false,
+        !params.no_new,
     );
 
     gen.extend(builder);
@@ -85,7 +129,7 @@ fn component_from_struct(mut ast: syn::ItemStruct) -> TokenStream {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn component_from_impl(vis: syn::Visibility, mut ast: syn::ItemImpl) -> TokenStream {
+fn component_from_impl(params: ComponentParams, mut ast: syn::ItemImpl) -> TokenStream {
     let impl_generics = &ast.generics;
     let impl_type = &ast.self_ty;
     let new = get_new(&mut ast.items).expect(
@@ -121,7 +165,7 @@ fn component_from_impl(vis: syn::Visibility, mut ast: syn::ItemImpl) -> TokenStr
 
     let mut gen: TokenStream = quote! { #ast }.into();
     let builder: TokenStream = implement_builder(
-        &vis,
+        &params.vis,
         impl_type,
         impl_generics,
         scope_type,
@@ -133,6 +177,27 @@ fn component_from_impl(vis: syn::Visibility, mut ast: syn::ItemImpl) -> TokenStr
 
     gen.extend(builder);
     gen
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[allow(clippy::too_many_arguments)]
+fn implement_new(impl_type: &syn::Type, args: &[(syn::Ident, syn::Type, bool)]) -> TokenStream {
+    let arg_decl = args.iter().map(|(name, ty, _)| quote! {#name: #ty});
+    let arg_name = args.iter().map(|(name, _, _)| name);
+
+    quote! {
+        impl #impl_type {
+            pub fn new(
+                #(#arg_decl),*
+            ) -> Self {
+                Self {
+                    #(#arg_name),*
+                }
+            }
+        }
+    }
+    .into()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -333,9 +398,9 @@ fn implement_builder(
             impl ::dill::TypedBuilderCast<#interfaces> for #builder_name
             {
                 fn cast(self) -> impl ::dill::TypedBuilder<#interfaces> {
-                    struct B(#builder_name);
+                    struct _B(#builder_name);
 
-                    impl ::dill::Builder for B {
+                    impl ::dill::Builder for _B {
                         fn instance_type_id(&self) -> ::std::any::TypeId {
                             self.0.instance_type_id()
                         }
@@ -356,7 +421,7 @@ fn implement_builder(
                         }
                     }
 
-                    impl ::dill::TypedBuilder<#interfaces> for B {
+                    impl ::dill::TypedBuilder<#interfaces> for _B {
                         fn get(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<#interfaces>, ::dill::InjectionError> {
                             match self.0.get(cat) {
                                 Ok(v) => Ok(v),
@@ -365,7 +430,7 @@ fn implement_builder(
                         }
                     }
 
-                    B(self)
+                    _B(self)
                 }
             }
         )*

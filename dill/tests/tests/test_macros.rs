@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 #[test]
 fn test_macro_without_use() {
     trait A: Send + Sync {
@@ -32,4 +34,96 @@ fn test_macro_without_use() {
 
     assert_eq!(inst1.test(), "aimpl::foo");
     assert_eq!(inst2.test(), "aimpl::foo");
+}
+
+#[test]
+fn test_macro_explicit_args() {
+    use dill::*;
+
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    trait B: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    #[component]
+    struct AImpl {
+        b: Arc<dyn B>,
+
+        #[component(explicit)]
+        suffix: String,
+    }
+    impl A for AImpl {
+        fn test(&self) -> String {
+            format!("aimpl::{}::{}", self.b.test(), self.suffix)
+        }
+    }
+
+    #[component]
+    #[interface(dyn B)]
+    struct BImpl;
+    impl B for BImpl {
+        fn test(&self) -> String {
+            "bimpl".to_owned()
+        }
+    }
+
+    let cat = Catalog::builder()
+        .add::<BImpl>()
+        .add_builder(AImpl::builder("foo".to_string()))
+        .build();
+
+    let a = cat.get_one::<AImpl>().unwrap();
+    assert_eq!(a.test(), "aimpl::bimpl::foo");
+}
+
+#[test]
+fn test_macro_generates_new() {
+    use dill::*;
+
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    trait B: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    // With generated new
+    #[component]
+    struct AImpl1 {
+        b: Arc<dyn B>,
+    }
+    impl A for AImpl1 {
+        fn test(&self) -> String {
+            format!("aimpl::{}", self.b.test())
+        }
+    }
+
+    // With custom new
+    #[component(no_new)]
+    struct AImpl2 {
+        #[expect(unused)]
+        b: Arc<dyn B>,
+    }
+    impl AImpl2 {
+        // This would cause compile error if `no_new` was not respected
+        #[expect(unused)]
+        pub fn new() -> Self {
+            unreachable!()
+        }
+    }
+
+    #[component]
+    struct BImpl;
+    impl B for BImpl {
+        fn test(&self) -> String {
+            "bimpl".to_owned()
+        }
+    }
+
+    let a = AImpl1::new(Arc::new(BImpl::new()));
+    assert_eq!(a.test(), "aimpl::bimpl");
 }
