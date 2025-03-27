@@ -284,10 +284,6 @@ fn implement_builder(
 
                 fn register(cat: &mut ::dill::CatalogBuilder) {
                     cat.add_builder(Self::builder());
-
-                    #(
-                        cat.bind::<#interfaces, #impl_type>();
-                    )*
                 }
 
                 fn builder() -> Self::Builder {
@@ -395,8 +391,16 @@ fn implement_builder(
             }
         }
 
+        impl ::dill::TypedBuilderInterfaceBinder for #builder_name {
+            fn bind_interfaces(cat: &mut ::dill::CatalogBuilder) {
+                #(
+                    cat.bind::<#interfaces, #impl_type>();
+                )*
+            }
+        }
+
         #(
-            // Allows casting TypedBuider<T> into TypedBuilder<dyn I> for all declared interfaces
+            // Allows casting TypedBuilder<T> into TypedBuilder<dyn I> for all declared interfaces
             impl ::dill::TypedBuilderCast<#interfaces> for #builder_name
             {
                 fn cast(self) -> impl ::dill::TypedBuilder<#interfaces> {
