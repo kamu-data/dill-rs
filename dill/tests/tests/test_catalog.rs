@@ -240,3 +240,84 @@ async fn test_catalog_scope() {
     // skipped
     assert_eq!(proof.as_str(), "2");
 }
+
+#[test]
+fn test_catalog_binds_interfaces_for_builder_with_impl_without_explicit_args() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    #[component]
+    #[interface(dyn A)]
+    struct AImpl;
+
+    impl A for AImpl {
+        fn test(&self) -> String {
+            "aimpl".to_string()
+        }
+    }
+
+    // NOTE: In this case it is more correct to write it like `.add::<AImpl>()`,
+    //       but for the sake of the test we use another `add_builder()` method
+    let catalog = CatalogBuilder::new().add_builder(AImpl::builder()).build();
+
+    let a_impl = catalog.get_one::<AImpl>().unwrap();
+    assert_eq!(a_impl.test(), "aimpl");
+
+    let a = catalog.get_one::<dyn A>().unwrap();
+    assert_eq!(a.test(), "aimpl");
+}
+
+#[test]
+fn test_catalog_binds_interfaces_for_builder_with_explicit_args() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    #[component]
+    #[interface(dyn A)]
+    struct AImpl {
+        #[component(explicit)]
+        suffix: String,
+    }
+
+    impl A for AImpl {
+        fn test(&self) -> String {
+            format!("aimpl::{}", self.suffix)
+        }
+    }
+
+    let catalog = CatalogBuilder::new()
+        .add_builder(AImpl::builder("foo".to_string()))
+        .build();
+
+    let a_impl = catalog.get_one::<AImpl>().unwrap();
+    assert_eq!(a_impl.test(), "aimpl::foo");
+
+    let a = catalog.get_one::<dyn A>().unwrap();
+    assert_eq!(a.test(), "aimpl::foo");
+}
+
+#[test]
+fn test_catalog_binds_interfaces_for_builder_does_not_require_an_explicit_bind() {
+    trait A: Send + Sync {}
+
+    #[component]
+    #[interface(dyn A)]
+    struct AImpl {}
+
+    impl A for AImpl {}
+
+    let catalog = CatalogBuilder::new()
+        .add_builder(AImpl::builder())
+        .bind::<dyn A, AImpl>()
+        .build();
+
+    let _a_impl = catalog.get_one::<AImpl>().unwrap();
+
+    // NOTE: For some unknown reason, `matches!()` does not work in this test
+    match catalog.get_one::<dyn A>() {
+        Err(InjectionError::Ambiguous(_)) => {}
+        _ => panic!("Expected an ambiguous error"),
+    }
+}
