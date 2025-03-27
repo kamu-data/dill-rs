@@ -257,8 +257,8 @@ fn test_catalog_binds_interfaces_for_builder_with_impl_without_explicit_args() {
         }
     }
 
-    // NOTE: In this case it is more correct to write it like `.add::<AImpl>()`,
-    //       but for the sake of the test we use another `add_builder()` method
+    // NOTE: In this case it is more correct to use `.add::<AImpl>()`,
+    //       but for the sake of the test we use `add_builder()` method
     let catalog = CatalogBuilder::new().add_builder(AImpl::builder()).build();
 
     let a_impl = catalog.get_one::<AImpl>().unwrap();
