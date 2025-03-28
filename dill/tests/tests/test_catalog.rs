@@ -269,6 +269,35 @@ fn test_catalog_binds_interfaces_for_builder_with_impl_without_explicit_args() {
 }
 
 #[test]
+fn test_catalog_skips_interfaces_binding_for_builder_with_impl_without_explicit_args() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    #[component]
+    #[interface(dyn A)]
+    struct AImpl;
+
+    impl A for AImpl {
+        fn test(&self) -> String {
+            "aimpl".to_string()
+        }
+    }
+
+    let catalog = CatalogBuilder::new()
+        .add_builder(AImpl::builder().without_default_interfaces())
+        .build();
+
+    let a_impl = catalog.get_one::<AImpl>().unwrap();
+    assert_eq!(a_impl.test(), "aimpl");
+
+    match catalog.get_one::<dyn A>() {
+        Err(InjectionError::Unregistered(_)) => {}
+        _ => panic!("Expected an unregistered error"),
+    }
+}
+
+#[test]
 fn test_catalog_binds_interfaces_for_builder_with_explicit_args() {
     trait A: Send + Sync {
         fn test(&self) -> String;
@@ -299,6 +328,38 @@ fn test_catalog_binds_interfaces_for_builder_with_explicit_args() {
 }
 
 #[test]
+fn test_catalog_skips_interfaces_binding_for_builder_with_explicit_args() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    #[component]
+    #[interface(dyn A)]
+    struct AImpl {
+        #[component(explicit)]
+        suffix: String,
+    }
+
+    impl A for AImpl {
+        fn test(&self) -> String {
+            format!("aimpl::{}", self.suffix)
+        }
+    }
+
+    let catalog = CatalogBuilder::new()
+        .add_builder(AImpl::builder("foo".to_string()).without_default_interfaces())
+        .build();
+
+    let a_impl = catalog.get_one::<AImpl>().unwrap();
+    assert_eq!(a_impl.test(), "aimpl::foo");
+
+    match catalog.get_one::<dyn A>() {
+        Err(InjectionError::Unregistered(_)) => {}
+        _ => panic!("Expected an unregistered error"),
+    }
+}
+
+#[test]
 fn test_catalog_binds_interfaces_for_builder_does_not_require_an_explicit_bind() {
     trait A: Send + Sync {}
 
@@ -315,7 +376,6 @@ fn test_catalog_binds_interfaces_for_builder_does_not_require_an_explicit_bind()
 
     let _a_impl = catalog.get_one::<AImpl>().unwrap();
 
-    // NOTE: For some unknown reason, `matches!()` does not work in this test
     match catalog.get_one::<dyn A>() {
         Err(InjectionError::Ambiguous(_)) => {}
         _ => panic!("Expected an ambiguous error"),

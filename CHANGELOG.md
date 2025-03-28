@@ -6,7 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- `CatalogBuilder::add_builder()` method will automatically register interfaces (`#[interface(dyn Iface)]`) for `#[component]`
+- `CatalogBuilder::add_builder()` method will automatically register interfaces (`#[interface(dyn Iface)]`) for `#[component]`.
+  - To disable registration, a builder method has been added: 
+    ```rust
+    let catalog = CatalogBuilder::new()
+        .add_builder(Impl::builder().without_default_interfaces())
+        .build();
+    ```
 
 ## [0.12.4] - 2025-03-26
 ### Fixed
