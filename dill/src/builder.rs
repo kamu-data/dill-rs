@@ -153,9 +153,10 @@ pub trait TypedBuilderCast<I: Send + Sync + ?Sized> {
 
 /// Allows [CatalogBuilder::add()] to accept types with associated builder
 pub trait Component {
-    type Builder: Builder;
+    type Impl: Send + Sync;
+    type Builder: TypedBuilder<Self::Impl>;
+
     fn builder() -> Self::Builder;
-    fn register(cat: &mut CatalogBuilder);
 }
 
 #[derive(Debug, Copy, Clone)]

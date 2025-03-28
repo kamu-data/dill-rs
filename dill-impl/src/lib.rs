@@ -280,11 +280,8 @@ fn implement_builder(
     let component_or_explicit_factory = if explicit_arg_decl.is_empty() {
         quote! {
             impl ::dill::Component for #impl_type {
+                type Impl = #impl_type;
                 type Builder = #builder_name;
-
-                fn register(cat: &mut ::dill::CatalogBuilder) {
-                    cat.add_builder(Self::builder());
-                }
 
                 fn builder() -> Self::Builder {
                     #builder_name::new()

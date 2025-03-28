@@ -46,15 +46,19 @@ impl CatalogBuilder {
     ///
     /// Note that unlike [CatalogBuilder::add_builder()] this will also bind the
     /// implementation to component's default interfaces.
-    pub fn add<C: Component>(&mut self) -> &mut Self {
-        C::register(self);
+    pub fn add<C>(&mut self) -> &mut Self
+    where
+        C: 'static + Component,
+    {
+        let builder = C::builder();
+        self.add_builder(builder);
         self
     }
 
     pub fn add_builder<Bld, Impl>(&mut self, builder: Bld) -> &mut Self
     where
         Impl: 'static + Send + Sync,
-        Bld: TypedBuilder<Impl> + 'static,
+        Bld: 'static + TypedBuilder<Impl>,
     {
         let key = ImplTypeId(TypeId::of::<Impl>());
         if self.builders.contains_key(&key) {
