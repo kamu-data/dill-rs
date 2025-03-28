@@ -33,7 +33,7 @@
 //!
 //! impl B {
 //!     fn bar(&self) -> String {
-//!         format!("b")
+//!         "b".to_string()
 //!     }
 //! }
 //!
@@ -66,7 +66,7 @@
 //! struct AImpl1;
 //! impl A for AImpl1 {
 //!     fn foo(&self) -> String {
-//!         format!("aimpl1")
+//!         "aimpl1".to_string()
 //!     }
 //! }
 //!
@@ -74,7 +74,7 @@
 //! struct AImpl2;
 //! impl A for AImpl2 {
 //!     fn foo(&self) -> String {
-//!         format!("aimpl2")
+//!         "aimpl2".to_string()
 //!     }
 //! }
 //!

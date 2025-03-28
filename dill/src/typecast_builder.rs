@@ -45,7 +45,7 @@ where
         self.builder.interfaces(clb);
     }
 
-    fn metadata<'b, 'c>(&'b self, clb: &'c mut dyn FnMut(&'b dyn std::any::Any) -> bool) {
+    fn metadata<'b, 'c>(&'b self, clb: &'c mut dyn FnMut(&'b dyn Any) -> bool) {
         self.builder.metadata(clb)
     }
 

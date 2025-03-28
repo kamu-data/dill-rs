@@ -135,7 +135,7 @@ impl<Inner: DependencySpec> DependencySpec for Maybe<Inner> {
 // Lazy
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Delays the instantiation of a component untill explicitly requested.
+/// Delays the instantiation of a component until explicitly requested.
 ///
 /// See [`crate::lazy::Lazy`] documentation for details.
 pub struct Lazy<Inner: DependencySpec> {

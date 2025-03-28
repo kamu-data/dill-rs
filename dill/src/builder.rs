@@ -1,4 +1,4 @@
-use std::any::{Any, TypeId};
+use std::any::{type_name, Any, TypeId};
 use std::sync::{Arc, Mutex};
 
 use crate::*;
@@ -58,7 +58,7 @@ impl<T: Builder + ?Sized> BuilderExt for T {
     }
 
     fn interfaces_contain<Iface: 'static>(&self) -> bool {
-        let type_id = std::any::TypeId::of::<Iface>();
+        let type_id = TypeId::of::<Iface>();
         self.interfaces_contain_type_id(&type_id)
     }
     fn interfaces_contain_type_id(&self, type_id: &TypeId) -> bool {
@@ -177,12 +177,12 @@ where
     }
 
     fn instance_type_name(&self) -> &'static str {
-        std::any::type_name::<Impl>()
+        type_name::<Impl>()
     }
 
     fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
 
-    fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
+    fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn Any) -> bool) {}
 
     fn get_any(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self.clone())
@@ -221,12 +221,12 @@ where
     }
 
     fn instance_type_name(&self) -> &'static str {
-        std::any::type_name::<Impl>()
+        type_name::<Impl>()
     }
 
     fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
 
-    fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
+    fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn Any) -> bool) {}
 
     fn get_any(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self())
@@ -297,12 +297,12 @@ where
     }
 
     fn instance_type_name(&self) -> &'static str {
-        std::any::type_name::<Impl>()
+        type_name::<Impl>()
     }
 
     fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
 
-    fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {}
+    fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn Any) -> bool) {}
 
     fn get_any(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(TypedBuilder::get(self, cat)?)

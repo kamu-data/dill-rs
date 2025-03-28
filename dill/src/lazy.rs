@@ -4,7 +4,7 @@ use crate::InjectionError;
 
 /// Represents a value whose construction is delayed upon request rather than
 /// resolved from the catalog immediately. This is often useful in cases when
-/// some expensive type is used rarely, thus it's benefitial to only construct
+/// some expensive type is used rarely, thus it's beneficial to only construct
 /// it on-demand.
 ///
 /// When instance is requested, this type will first attempt to resolve it using
@@ -14,7 +14,7 @@ use crate::InjectionError;
 /// present when the `Lazy<T>` itself is injected.
 ///
 /// Note that this style of injection still respects the component's control
-/// over its own lifetime via [`crate::Scope`]. So its recommended to use
+/// over its own lifetime via [`crate::Scope`]. So It's recommended to use
 /// [`Self::get`] liberally and release the instances ASAP without attempting
 /// to cache them.
 ///

@@ -10,4 +10,4 @@ cargo run -p example-axum
   - Showcases using DI together with [`axum`](https://docs.rs/axum) crate
   - Provides an example of using `axum` layers to extract information from the request (e.g. auth token) and add it into request-scoped catalog
 - [`cli`](./cli/)
-  - Showcases using DI in a command line application to contruct `Command` objects that combine injected dependencies with explicit command arguments
+  - Showcases using DI in a command line application to construct `Command` objects that combine injected dependencies with explicit command arguments

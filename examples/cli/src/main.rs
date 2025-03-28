@@ -12,7 +12,7 @@ async fn main() -> std::io::Result<()> {
     let args = cli::Cli::parse();
 
     // Select the appropriate command builder based on CLI arguments.
-    // Command builders use #[component(explitic)] attributes to mark values they
+    // Command builders use #[component(explicit)] attributes to mark values they
     // want to take directly from CLI arguments instead of injecting them.
     let command_builder: Box<dyn dill::TypedBuilder<dyn Command>> = match args.command {
         cli::Command::Add(add) => {

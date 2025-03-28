@@ -112,7 +112,7 @@ impl Catalog {
     /// Sets this catalog as "current" in the async task scope for the duration
     /// of the provided coroutine.
     ///
-    /// Most useful when used in combination with [`crate::lazy::Lazy`] and
+    /// Most useful when used in combination with [`Lazy`] and
     /// [`Self::builder_chained()`] for dynamically registering additional
     /// types.
     ///
@@ -145,7 +145,7 @@ impl Catalog {
     /// Allows accessing the catalog in the current [`Self::scope`].
     ///
     /// Note that you should very rarely be using this method directly if at
-    /// all. Instead you should rely on [`crate::lazy::Lazy`] for
+    /// all. Instead, you should rely on [`Lazy`] for
     /// delayed injection from a current catalog.
     ///
     /// ### Panics

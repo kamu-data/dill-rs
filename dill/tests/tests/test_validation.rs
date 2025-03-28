@@ -68,7 +68,7 @@ fn test_validate_static_graph() {
 }
 
 #[test]
-fn test_validate_ingores_bound_fields() {
+fn test_validate_ignores_bound_fields() {
     trait A: Send + Sync {}
 
     #[allow(dead_code)]

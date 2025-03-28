@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.1] - 2024-08-15
 ### Fixed
-- `Catalog::builders_for_with_meta()` works corectly for chained catalogs
+- `Catalog::builders_for_with_meta()` works correctly for chained catalogs
 
 ## [0.9.0] - 2024-07-29
 ### Added
