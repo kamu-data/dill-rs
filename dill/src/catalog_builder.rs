@@ -54,7 +54,7 @@ impl CatalogBuilder {
     pub fn add_builder<Bld, Impl>(&mut self, builder: Bld) -> &mut Self
     where
         Impl: 'static + Send + Sync,
-        Bld: TypedBuilder<Impl> + TypedBuilderInterfaceBinder + 'static,
+        Bld: TypedBuilder<Impl> + 'static,
     {
         let key = ImplTypeId(TypeId::of::<Impl>());
         if self.builders.contains_key(&key) {
@@ -64,9 +64,10 @@ impl CatalogBuilder {
             );
         }
 
-        let builder = Arc::new(builder);
-        self.builders.insert(key, builder.clone());
+        let builder_arc = Arc::new(builder);
+        self.builders.insert(key, builder_arc.clone());
 
+        // Bind implementation
         self.bindings.insert(
             IfaceTypeId(TypeId::of::<Impl>()),
             Binding::new(
@@ -75,11 +76,14 @@ impl CatalogBuilder {
                     // instances
                     cast_arc: |v| v.downcast().unwrap(),
                 }),
-                builder,
+                builder_arc.clone(),
             ),
         );
 
-        Bld::bind_interfaces(self);
+        // To call the correct `TypedBuilder<Impl>::bind_interfaces()` method,
+        // we need to call it exactly on `TypedBuilder<Impl>` type,
+        // not `Arc<TypedBuilder<Impl>>`, which has an empty (default) implementation
+        (*builder_arc).bind_interfaces(self);
 
         self
     }

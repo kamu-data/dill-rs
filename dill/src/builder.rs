@@ -142,14 +142,13 @@ impl<T: Builder + ?Sized> BuilderExt for T {
 
 pub trait TypedBuilder<T: Send + Sync + ?Sized>: Builder {
     fn get(&self, cat: &Catalog) -> Result<Arc<T>, InjectionError>;
+
+    // Will be overridden in structures
+    fn bind_interfaces(&self, _cat: &mut CatalogBuilder) {}
 }
 
 pub trait TypedBuilderCast<I: Send + Sync + ?Sized> {
     fn cast(self) -> impl TypedBuilder<I>;
-}
-
-pub trait TypedBuilderInterfaceBinder {
-    fn bind_interfaces(_cat: &mut CatalogBuilder) {}
 }
 
 /// Allows [CatalogBuilder::add()] to accept types with associated builder
@@ -202,12 +201,6 @@ where
     }
 }
 
-impl<Impl> TypedBuilderInterfaceBinder for Arc<Impl> {
-    fn bind_interfaces(_cat: &mut CatalogBuilder) {
-        // Interfaces are unknown, nothing to register
-    }
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Fn() -> Arc<T> acts as a builder
@@ -244,16 +237,6 @@ where
 {
     fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
         Ok(self())
-    }
-}
-
-impl<Fct, Impl> TypedBuilderInterfaceBinder for Fct
-where
-    Fct: FnOnce() -> Impl + Send + Sync,
-    Impl: 'static + Send + Sync,
-{
-    fn bind_interfaces(_cat: &mut CatalogBuilder) {
-        // Interfaces are unknown, nothing to register
     }
 }
 
@@ -328,15 +311,5 @@ where
             s.instance = Some(inst.clone());
             Ok(inst)
         }
-    }
-}
-
-impl<Fct, Impl> TypedBuilderInterfaceBinder for LazyBuilder<Fct, Impl>
-where
-    Fct: FnOnce() -> Impl + Send + Sync,
-    Impl: 'static + Send + Sync,
-{
-    fn bind_interfaces(_cat: &mut CatalogBuilder) {
-        // Interfaces are unknown, nothing to register
     }
 }

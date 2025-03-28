@@ -389,10 +389,8 @@ fn implement_builder(
                 self.dill_builder_scope.set(inst.clone());
                 Ok(inst)
             }
-        }
 
-        impl ::dill::TypedBuilderInterfaceBinder for #builder_name {
-            fn bind_interfaces(cat: &mut ::dill::CatalogBuilder) {
+            fn bind_interfaces(&self, cat: &mut ::dill::CatalogBuilder) {
                 #(
                     cat.bind::<#interfaces, #impl_type>();
                 )*
@@ -433,6 +431,10 @@ fn implement_builder(
                                 Ok(v) => Ok(v),
                                 Err(e) => Err(e),
                             }
+                        }
+
+                        fn bind_interfaces(&self, cat: &mut ::dill::CatalogBuilder) {
+                            self.0.bind_interfaces(cat);
                         }
                     }
 
