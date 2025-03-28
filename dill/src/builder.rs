@@ -1,4 +1,4 @@
-use std::any::{type_name, Any, TypeId};
+use std::any::{Any, TypeId};
 use std::sync::{Arc, Mutex};
 
 use crate::*;
@@ -61,6 +61,7 @@ impl<T: Builder + ?Sized> BuilderExt for T {
         let type_id = TypeId::of::<Iface>();
         self.interfaces_contain_type_id(&type_id)
     }
+
     fn interfaces_contain_type_id(&self, type_id: &TypeId) -> bool {
         let mut ret = false;
         self.interfaces(&mut |i| {
@@ -141,10 +142,19 @@ impl<T: Builder + ?Sized> BuilderExt for T {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait TypedBuilder<T: Send + Sync + ?Sized>: Builder {
+    /// Called to get an instance of the component, respecting the lifetime
+    /// defined by the scope
     fn get(&self, cat: &Catalog) -> Result<Arc<T>, InjectionError>;
 
-    // Will be overridden in structures
-    fn bind_interfaces(&self, _cat: &mut CatalogBuilder) {}
+    /// Called during registration to automatically bind this builder to all
+    /// interfaces this component implements
+    fn bind_interfaces(&self, cat: &mut CatalogBuilder);
+}
+
+pub trait TypedBuilderExt<T: Send + Sync + ?Sized>: TypedBuilder<T> {
+    /// Stops builder from auto-registering the default interfaces, allowing a
+    /// fine-grain control over the binding
+    fn without_default_interfaces(self) -> impl TypedBuilder<T>;
 }
 
 pub trait TypedBuilderCast<I: Send + Sync + ?Sized> {
@@ -167,6 +177,62 @@ pub struct InterfaceDesc {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+impl<Bld, Impl> TypedBuilderExt<Impl> for Bld
+where
+    Impl: Send + Sync,
+    Bld: TypedBuilder<Impl>,
+{
+    fn without_default_interfaces(self) -> impl TypedBuilder<Impl> {
+        TypedBuilderWithoudDefaultInterfaces(self)
+    }
+}
+
+/// A wrapper builder that stops it from auto-registering default interfaces
+pub struct TypedBuilderWithoudDefaultInterfaces<Bld>(Bld);
+
+impl<Bld> Builder for TypedBuilderWithoudDefaultInterfaces<Bld>
+where
+    Bld: Builder,
+{
+    fn instance_type_id(&self) -> TypeId {
+        self.0.instance_type_id()
+    }
+
+    fn instance_type_name(&self) -> &'static str {
+        self.0.instance_type_name()
+    }
+
+    fn interfaces(&self, clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {
+        self.0.interfaces(clb);
+    }
+
+    fn metadata<'a>(&'a self, clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {
+        self.0.metadata(clb);
+    }
+
+    fn get_any(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+        self.0.get_any(cat)
+    }
+
+    fn check(&self, cat: &Catalog) -> Result<(), ValidationError> {
+        self.0.check(cat)
+    }
+}
+
+impl<Bld, Impl> TypedBuilder<Impl> for TypedBuilderWithoudDefaultInterfaces<Bld>
+where
+    Impl: Send + Sync,
+    Bld: TypedBuilder<Impl>,
+{
+    fn get(&self, cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
+        self.0.get(cat)
+    }
+
+    fn bind_interfaces(&self, _cat: &mut CatalogBuilder) {}
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 /// Arc<T> can infinitely produce clones of itself and therefore is a builder
 impl<Impl> Builder for Arc<Impl>
 where
@@ -177,7 +243,7 @@ where
     }
 
     fn instance_type_name(&self) -> &'static str {
-        type_name::<Impl>()
+        std::any::type_name::<Impl>()
     }
 
     fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
@@ -200,6 +266,8 @@ where
     fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
         Ok(self.clone())
     }
+
+    fn bind_interfaces(&self, _cat: &mut CatalogBuilder) {}
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -215,7 +283,7 @@ where
     }
 
     fn instance_type_name(&self) -> &'static str {
-        type_name::<Impl>()
+        std::any::type_name::<Impl>()
     }
 
     fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
@@ -239,6 +307,8 @@ where
     fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
         Ok(self())
     }
+
+    fn bind_interfaces(&self, _cat: &mut CatalogBuilder) {}
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -281,7 +351,7 @@ where
     }
 
     fn instance_type_name(&self) -> &'static str {
-        type_name::<Impl>()
+        std::any::type_name::<Impl>()
     }
 
     fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
@@ -313,4 +383,6 @@ where
             Ok(inst)
         }
     }
+
+    fn bind_interfaces(&self, _cat: &mut CatalogBuilder) {}
 }

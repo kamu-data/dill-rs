@@ -306,7 +306,6 @@ fn implement_builder(
     let builder = quote! {
         #impl_vis struct #builder_name {
             dill_builder_scope: #scope_type,
-            bind_default_interfaces: bool,
             #(#arg_override_fn_field),*
         }
 
@@ -318,15 +317,7 @@ fn implement_builder(
             ) -> Self {
                 Self {
                     dill_builder_scope: #scope_type::new(),
-                    bind_default_interfaces: true,
                     #(#arg_override_fn_field_ctor),*
-                }
-            }
-
-            pub fn without_default_interfaces(self) -> Self {
-                Self {
-                    bind_default_interfaces: false,
-                    ..self
                 }
             }
 
@@ -397,10 +388,6 @@ fn implement_builder(
             }
 
             fn bind_interfaces(&self, cat: &mut ::dill::CatalogBuilder) {
-                if !self.bind_default_interfaces {
-                    return;
-                }
-
                 #(
                     cat.bind::<#interfaces, #impl_type>();
                 )*
