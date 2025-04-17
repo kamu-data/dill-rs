@@ -169,6 +169,7 @@ mod catalog;
 mod catalog_builder;
 mod errors;
 mod lazy;
+pub mod macros;
 mod scopes;
 pub mod specs;
 mod typecast_builder;

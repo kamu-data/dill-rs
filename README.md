@@ -63,9 +63,19 @@ let cat = Catalog::builder()
     .bind::<dyn B, BImpl>()
     .build();
 
-// Get objects and have their deps satisfied automatically
-let inst = cat.get::<OneOf<dyn A>>().unwrap();
-assert_eq!(inst.test(), "aimpl::bimpl");
+// Get objects and have their deps satisfied automatically:
+// 1) Explicit specification usage:
+let inst_a_1 = cat.get::<OneOf<dyn A>>().unwrap();
+assert_eq!(inst_a_1.test(), "aimpl::bimpl");
+
+// 2) Using shorthand:
+let inst_a_2 = cat.get_one::<dyn A>().unwrap();
+assert_eq!(inst_a_2.test(), "aimpl::bimpl");
+
+// 3) Using macro helper:
+let (inst_a_3, inst_b) = dill::from_catalog_n!(cat, dyn A, dyn B);
+assert_eq!(inst_a_3.test(), "aimpl::bimpl");
+assert_eq!(inst_b.test(), "bimpl");
 ```
 
 
@@ -112,7 +122,6 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 
 # TODO
 - Support `stable` rust
-- Support builders providing own interface lists (default bindings)
 - Improve graph validation
 - Make `Scope`s external to `Builder`s so they could be overridden
 - Allow dynamic registration (without cloning entire catalogs)
@@ -139,5 +148,3 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - Support PImpl idiom, where `Arc<dyn Iface>` can be hidden behind a movable object
   - This even further hides lifetime management from consumers
   - Allows generic methods to be implemented to improve usability of `dyn Trait` (e.g. accepting `impl AsRef<str>` parameters instead of `&str`)
-
-
