@@ -89,11 +89,11 @@ impl<T: Builder + ?Sized> BuilderExt for T {
     fn metadata_find_first<Meta: 'static>(&self, pred: impl Fn(&Meta) -> bool) -> Option<&Meta> {
         let mut ret: Option<&Meta> = None;
         self.metadata(&mut |m| {
-            if let Some(v) = m.downcast_ref::<Meta>() {
-                if pred(v) {
-                    ret = Some(v);
-                    return false;
-                }
+            if let Some(v) = m.downcast_ref::<Meta>()
+                && pred(v)
+            {
+                ret = Some(v);
+                return false;
             }
             true
         });
@@ -114,10 +114,10 @@ impl<T: Builder + ?Sized> BuilderExt for T {
     fn metadata_find_all<Meta: 'static>(&self, pred: impl Fn(&Meta) -> bool) -> Vec<&Meta> {
         let mut ret: Vec<&Meta> = Vec::new();
         self.metadata(&mut |m| {
-            if let Some(v) = m.downcast_ref::<Meta>() {
-                if pred(v) {
-                    ret.push(v);
-                }
+            if let Some(v) = m.downcast_ref::<Meta>()
+                && pred(v)
+            {
+                ret.push(v);
             }
             true
         });
@@ -127,11 +127,11 @@ impl<T: Builder + ?Sized> BuilderExt for T {
     fn metadata_contains<Meta: 'static>(&self, pred: impl Fn(&Meta) -> bool) -> bool {
         let mut ret = false;
         self.metadata(&mut |m| {
-            if let Some(v) = m.downcast_ref::<Meta>() {
-                if pred(v) {
-                    ret = true;
-                    return false;
-                }
+            if let Some(v) = m.downcast_ref::<Meta>()
+                && pred(v)
+            {
+                ret = true;
+                return false;
             }
             true
         });

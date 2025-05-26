@@ -1,4 +1,4 @@
-use std::any::{type_name, TypeId};
+use std::any::{TypeId, type_name};
 use std::collections::HashMap;
 use std::marker::Unsize;
 use std::sync::Arc;

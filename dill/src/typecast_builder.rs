@@ -101,16 +101,16 @@ impl<'a, Iface: 'static + ?Sized> TypecastBuilderIterator<'a, Iface> {
 impl<'a, Iface: 'static + ?Sized> Iterator for TypecastBuilderIterator<'a, Iface> {
     type Item = TypecastBuilder<'a, Iface>;
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(bindings) = self.bindings {
-            if self.pos < bindings.len() {
-                let b = &bindings[self.pos];
-                self.pos += 1;
+        if let Some(bindings) = self.bindings
+            && self.pos < bindings.len()
+        {
+            let b = &bindings[self.pos];
+            self.pos += 1;
 
-                // SAFETY: the TypeID key of the `bindings` map is guaranteed to match the
-                // `Iface` type
-                let caster: &TypeCaster<Iface> = b.caster.downcast_ref().unwrap();
-                return Some(TypecastBuilder::new(b.builder.as_ref(), caster));
-            }
+            // SAFETY: the TypeID key of the `bindings` map is guaranteed to match the
+            // `Iface` type
+            let caster: &TypeCaster<Iface> = b.caster.downcast_ref().unwrap();
+            return Some(TypecastBuilder::new(b.builder.as_ref(), caster));
         }
         None
     }

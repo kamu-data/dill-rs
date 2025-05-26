@@ -11,9 +11,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use axum::RequestExt;
 use axum::body::Body;
 use axum::response::{IntoResponse, Response};
-use axum::RequestExt;
 use axum_extra::typed_header::TypedHeader;
 use headers::authorization::{Authorization, Bearer};
 use tower::{Layer, Service};

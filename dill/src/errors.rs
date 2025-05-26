@@ -1,4 +1,4 @@
-use std::any::{type_name, TypeId};
+use std::any::{TypeId, type_name};
 
 use thiserror::Error;
 
@@ -60,7 +60,7 @@ impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "DI graph validation failed:")?;
         for (i, err) in self.errors.iter().enumerate() {
-            writeln!(f, "{}: {}", i, err)?;
+            writeln!(f, "{i}: {err}")?;
         }
         Ok(())
     }

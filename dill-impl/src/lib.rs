@@ -31,7 +31,7 @@ impl syn::parse::Parse for ComponentParams {
                         return Err(syn::Error::new(
                             ident.span(),
                             format!("Unexpected parameter: {s}"),
-                        ))
+                        ));
                     }
                 }
             }
@@ -106,10 +106,10 @@ fn component_from_struct(params: ComponentParams, mut ast: syn::ItemStruct) -> T
     let interfaces = get_interfaces(&ast.attrs);
     let meta = get_meta(&ast.attrs);
 
-    let mut gen: TokenStream = quote! { #ast }.into();
+    let mut stream: TokenStream = quote! { #ast }.into();
 
     if !params.no_new {
-        gen.extend(implement_new(&impl_type, &args));
+        stream.extend(implement_new(&impl_type, &args));
     }
 
     let builder: TokenStream = implement_builder(
@@ -123,8 +123,8 @@ fn component_from_struct(params: ComponentParams, mut ast: syn::ItemStruct) -> T
         !params.no_new,
     );
 
-    gen.extend(builder);
-    gen
+    stream.extend(builder);
+    stream
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -163,7 +163,7 @@ fn component_from_impl(params: ComponentParams, mut ast: syn::ItemImpl) -> Token
     let interfaces = get_interfaces(&ast.attrs);
     let meta = get_meta(&ast.attrs);
 
-    let mut gen: TokenStream = quote! { #ast }.into();
+    let mut stream: TokenStream = quote! { #ast }.into();
     let builder: TokenStream = implement_builder(
         &params.vis,
         impl_type,
@@ -175,8 +175,8 @@ fn component_from_impl(params: ComponentParams, mut ast: syn::ItemImpl) -> Token
         true,
     );
 
-    gen.extend(builder);
-    gen
+    stream.extend(builder);
+    stream
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
