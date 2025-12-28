@@ -24,4 +24,13 @@ thiserror = "2"
 multimap = "0.10"
 
 # Optional
-tokio = { optional = true, version = "1", default-features = false }
+tokio = { optional = true, version = "1", default-features = false, features = [
+    "rt",
+] }
+
+
+[dev-dependencies]
+tokio = { version = "1", default-features = false, features = [
+    "rt-multi-thread",
+    "macros",
+] }

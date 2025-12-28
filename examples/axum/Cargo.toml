@@ -16,7 +16,7 @@ include.workspace = true
 dill = { path = "../../dill" }
 
 axum = { version = "0.8" }
-axum-extra = { version = "0.10", features = ["typed-header"] }
+axum-extra = { version = "0.12", features = ["typed-header"] }
 headers = { version = "0.4" }
 http = { version = "1" }
 tokio = { version = "1", features = ["rt-multi-thread", "signal"] }
