@@ -157,12 +157,12 @@ impl<Inner: DependencySpec> DependencySpec for Lazy<Inner> {
         // It will however first attempt to resolve a current catalog if scope feature
         // is used and only use the former as a fallback.
         let fallback_cat = cat.clone();
-        Ok(crate::lazy::Lazy::new(move || match crate::CURRENT_CATALOG
-            .try_with(|cat| Inner::get(cat))
-        {
-            Ok(v) => v,
-            Err(_) => Inner::get(&fallback_cat),
-        }))
+        Ok(crate::lazy::Lazy::new(
+            move || match crate::catalog::CURRENT_CATALOG.try_with(|cat| Inner::get(cat)) {
+                Ok(v) => v,
+                Err(_) => Inner::get(&fallback_cat),
+            },
+        ))
     }
 
     fn check(cat: &Catalog) -> Result<(), InjectionError> {

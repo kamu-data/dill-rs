@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- New `Transaction` scope allows to cache and reuse instances within a scope defined by the lifetime of a chained `Catalog`
+### Changed
+- Improved `Scope` interface to avoid excessive locking and lookups
+
 ## [0.14.0] - 2025-05-26
 ### Changed
 - MSRV: Upgraded to latest `1.89.0-nightly` and `2024` edition

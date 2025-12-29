@@ -377,14 +377,12 @@ fn implement_builder(
             fn get(&self, cat: &::dill::Catalog) -> Result<std::sync::Arc<#impl_type>, ::dill::InjectionError> {
                 use ::dill::Scope;
 
-                if let Some(inst) = self.dill_builder_scope.get() {
-                    return Ok(inst.downcast().unwrap());
-                }
+                let inst = self.dill_builder_scope.get_or_create(cat, || {
+                    let inst = self.build(cat)?;
+                    Ok(::std::sync::Arc::new(inst))
+                })?;
 
-                let inst = ::std::sync::Arc::new(self.build(cat)?);
-
-                self.dill_builder_scope.set(inst.clone());
-                Ok(inst)
+                Ok(inst.downcast().unwrap())
             }
 
             fn bind_interfaces(&self, cat: &mut ::dill::CatalogBuilder) {
@@ -666,7 +664,7 @@ fn get_scope(attrs: &Vec<syn::Attribute>) -> Option<syn::Path> {
                 scope = Some(meta.path);
                 Ok(())
             })
-            .unwrap();
+            .expect("Could not parse scope");
         }
     }
 

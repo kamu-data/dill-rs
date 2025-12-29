@@ -165,17 +165,18 @@
 //! ```
 
 mod builder;
+pub mod cache;
 mod catalog;
 mod catalog_builder;
 mod errors;
 mod lazy;
-mod scopes;
+pub mod scopes;
 pub mod specs;
 mod typecast_builder;
 
 pub use builder::*;
-pub use catalog::*;
-pub use catalog_builder::*;
+pub use catalog::Catalog;
+pub use catalog_builder::CatalogBuilder;
 pub use dill_impl::*;
 pub use errors::*;
 pub use lazy::Lazy;

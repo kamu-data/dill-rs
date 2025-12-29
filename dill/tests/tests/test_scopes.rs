@@ -1,8 +1,9 @@
+use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Transient
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_transient() {
@@ -43,9 +44,9 @@ fn test_transient() {
     assert_eq!(inst2.test(), "aimpl::foo");
 }
 
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Singleton
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_singleton() {
@@ -84,7 +85,7 @@ fn test_singleton() {
     assert_eq!(inst2.test(), "aimpl::foo");
 }
 
-///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_chained_singleton() {
@@ -192,4 +193,121 @@ fn test_chained_singleton() {
 
     assert_eq!(inst_b_1.test(), "bimpl::unique");
     assert_eq!(inst_b_2.test(), "bimpl::unique");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Transaction
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_scope_transaction() {
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    struct AImpl {
+        pub name: Arc<std::sync::Mutex<String>>,
+        pub b: Option<Arc<dyn B>>,
+    }
+
+    #[dill::component]
+    #[dill::interface(dyn A)]
+    impl AImpl {
+        fn new(b: Option<Arc<dyn B>>) -> Self {
+            Self {
+                name: Default::default(),
+                b,
+            }
+        }
+
+        pub fn set_name(&self, name: impl Into<String>) {
+            *self.name.lock().unwrap() = name.into();
+        }
+    }
+
+    impl A for AImpl {
+        fn test(&self) -> String {
+            format!(
+                "{}::{}",
+                self.name.lock().unwrap(),
+                match &self.b {
+                    Some(b) => b.test(),
+                    None => "".to_string(),
+                }
+            )
+        }
+    }
+
+    trait B: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    struct BImpl {
+        pub name: Arc<std::sync::Mutex<String>>,
+    }
+
+    #[dill::component]
+    #[dill::interface(dyn B)]
+    #[dill::scope(dill::scopes::Transaction)]
+    impl BImpl {
+        pub fn new() -> Self {
+            Self {
+                name: Default::default(),
+            }
+        }
+
+        pub fn set_name(&self, name: impl Into<String>) {
+            *self.name.lock().unwrap() = name.into();
+        }
+    }
+
+    impl B for BImpl {
+        fn test(&self) -> String {
+            format!("{}", self.name.lock().unwrap().as_str())
+        }
+    }
+
+    let base = dill::Catalog::builder()
+        .add::<AImpl>()
+        .add::<BImpl>()
+        .build();
+
+    // Error if used outside of a transaction
+    assert_matches!(
+        base.get_one::<BImpl>().err(),
+        Some(dill::InjectionError::Unregistered(_))
+    );
+
+    // TX: 1
+    {
+        let tx = base
+            .builder_chained()
+            .add_value(dill::scopes::TransactionCache::new())
+            .build();
+
+        let a = tx.get_one::<AImpl>().unwrap();
+        let b = tx.get_one::<BImpl>().unwrap();
+        assert_eq!(a.test(), "::");
+
+        // `b` is same instance as injected into `a`
+        a.set_name("foo");
+        b.set_name("bar");
+        assert_eq!(a.test(), "foo::bar");
+
+        // Different A, but B is reused
+        let a = tx.get_one::<AImpl>().unwrap();
+        assert_eq!(a.test(), "::bar");
+    }
+
+    // TX: 2
+    {
+        let tx = base
+            .builder_chained()
+            .add_value(dill::scopes::TransactionCache::new())
+            .build();
+
+        // B instance was dropped with TX 1 and will be re-created
+        let a = tx.get_one::<AImpl>().unwrap();
+        assert_eq!(a.test(), "::");
+    }
 }
