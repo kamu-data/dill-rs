@@ -20,6 +20,7 @@ tokio = ["dep:tokio"]
 
 [dependencies]
 dill-impl = { workspace = true }
+indoc = { version = "2" }
 thiserror = "2"
 multimap = "0.10"
 
@@ -30,6 +31,7 @@ tokio = { optional = true, version = "1", default-features = false, features = [
 
 
 [dev-dependencies]
+pretty_assertions = { version = "1" }
 tokio = { version = "1", default-features = false, features = [
     "rt-multi-thread",
     "macros",

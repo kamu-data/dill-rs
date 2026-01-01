@@ -2,9 +2,11 @@ use std::any::{TypeId, type_name};
 
 use thiserror::Error;
 
+use crate::{InjectionContext, InjectionStack};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Error, Debug, Clone)]
 pub enum InjectionError {
     #[error(transparent)]
     Unregistered(UnregisteredTypeError),
@@ -15,43 +17,47 @@ pub enum InjectionError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl InjectionError {
-    pub fn unregistered<Iface: 'static + ?Sized>() -> Self {
+    pub fn unregistered<Iface: 'static + ?Sized>(ctx: &InjectionContext) -> Self {
         Self::Unregistered(UnregisteredTypeError {
             type_id: TypeId::of::<Iface>(),
             type_name: type_name::<Iface>(),
+            injection_stack: ctx.to_stack(),
         })
     }
 
     // TODO: Should contain information about which implementations were found
-    pub fn ambiguous<Iface: 'static + ?Sized>() -> Self {
+    pub fn ambiguous<Iface: 'static + ?Sized>(ctx: &InjectionContext) -> Self {
         Self::Ambiguous(AmbiguousTypeError {
             type_id: TypeId::of::<Iface>(),
             type_name: type_name::<Iface>(),
+            injection_stack: ctx.to_stack(),
         })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-#[error("Unregistered type: ${type_name}")]
+#[derive(Error, Debug, Clone)]
+#[error("Unregistered type: {type_name}\nInjection stack:\n{injection_stack}")]
 pub struct UnregisteredTypeError {
     pub type_id: TypeId,
     pub type_name: &'static str,
+    pub injection_stack: InjectionStack,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
-#[error("Ambiguous type: ${type_name}")]
+#[derive(Error, Debug, Clone)]
+#[error("Ambiguous type: {type_name}\nInjection stack:\n{injection_stack}")]
 pub struct AmbiguousTypeError {
     pub type_id: TypeId,
     pub type_name: &'static str,
+    pub injection_stack: InjectionStack,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[derive(Error, Debug, Clone)]
 pub struct ValidationError {
     pub errors: Vec<InjectionError>,
 }

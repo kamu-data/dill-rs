@@ -10,15 +10,14 @@ pub trait Cache: Send + Sync + 'static {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
 pub struct CacheImpl {
     slots: Arc<std::sync::RwLock<std::collections::BTreeMap<usize, Arc<dyn Any + Send + Sync>>>>,
 }
 
 impl CacheImpl {
     pub fn new() -> Self {
-        Self {
-            slots: Default::default(),
-        }
+        Self::default()
     }
 }
 

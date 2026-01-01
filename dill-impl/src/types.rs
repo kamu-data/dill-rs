@@ -3,6 +3,8 @@ use quote::ToTokens;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) enum InjectionType {
+    Catalog,
+    CatalogRef,
     Arc { inner: syn::Type },
     Reference { inner: syn::Type },
     Option { element: Box<InjectionType> },
@@ -12,8 +14,14 @@ pub(crate) enum InjectionType {
 }
 
 pub(crate) fn deduce_injection_type(typ: &syn::Type) -> InjectionType {
-    if let Some(inner) = strip_reference(typ) {
-        InjectionType::Reference { inner }
+    if is_catalog(typ) {
+        InjectionType::Catalog
+    } else if let Some(inner) = strip_reference(typ) {
+        if is_catalog(&inner) {
+            InjectionType::CatalogRef
+        } else {
+            InjectionType::Reference { inner }
+        }
     } else if let Some(inner) = get_arc_element_type(typ) {
         InjectionType::Arc { inner }
     } else if let Some(elem_typ) = get_option_element_type(typ) {
@@ -31,6 +39,16 @@ pub(crate) fn deduce_injection_type(typ: &syn::Type) -> InjectionType {
     } else {
         InjectionType::Value { typ: typ.clone() }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn is_catalog(typ: &syn::Type) -> bool {
+    let syn::Type::Path(typepath) = typ else {
+        return false;
+    };
+
+    typepath.qself.is_none() && typepath.path.segments.last().unwrap().ident == "Catalog"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

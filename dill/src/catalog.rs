@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use multimap::MultiMap;
 
+use crate::injection_context::InjectionContext;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,19 +95,32 @@ impl Catalog {
         }
     }
 
+    #[inline]
     pub fn get<Spec>(&self) -> Result<Spec::ReturnType, InjectionError>
     where
         Spec: DependencySpec + 'static,
     {
-        Spec::get(self)
+        self.get_with_context::<Spec>(&InjectionContext::new_root())
+    }
+
+    #[inline]
+    pub fn get_with_context<Spec>(
+        &self,
+        ctx: &InjectionContext,
+    ) -> Result<Spec::ReturnType, InjectionError>
+    where
+        Spec: DependencySpec + 'static,
+    {
+        Spec::get(self, &ctx.push_resolve::<Spec>())
     }
 
     /// A short-hand for `get::<OneOf<T>>()`.
+    #[inline]
     pub fn get_one<Iface>(&self) -> Result<Arc<Iface>, InjectionError>
     where
         Iface: 'static + ?Sized + Send + Sync,
     {
-        OneOf::<Iface>::get(self)
+        self.get::<OneOf<Iface>>()
     }
 
     /// Sets this catalog as "current" in the async task scope for the duration

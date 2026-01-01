@@ -1,7 +1,9 @@
 mod test_builder;
 mod test_catalog;
+mod test_graphviz;
 mod test_macros;
 mod test_metadata;
+mod test_plantuml;
 mod test_scopes;
 mod test_specs;
 mod test_threads;

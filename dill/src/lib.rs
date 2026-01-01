@@ -1,6 +1,4 @@
 #![feature(unsize)]
-#![feature(min_specialization)]
-#![feature(error_generic_member_access)]
 
 //! Runtime dependency injection.
 //!
@@ -169,16 +167,19 @@ pub mod cache;
 mod catalog;
 mod catalog_builder;
 mod errors;
+mod injection_context;
 mod lazy;
 pub mod scopes;
 pub mod specs;
 mod typecast_builder;
+pub mod utils;
 
 pub use builder::*;
 pub use catalog::Catalog;
 pub use catalog_builder::CatalogBuilder;
 pub use dill_impl::*;
 pub use errors::*;
+pub use injection_context::*;
 pub use lazy::Lazy;
 pub use scopes::*;
 pub use specs::*;

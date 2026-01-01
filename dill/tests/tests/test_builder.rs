@@ -1,4 +1,3 @@
-use std::any::TypeId;
 use std::sync::Arc;
 
 use dill::*;
@@ -28,11 +27,7 @@ fn test_type_info() {
     assert_eq!(builders.len(), 1);
 
     let builder = builders.into_iter().next().unwrap();
-    assert_eq!(builder.instance_type_id(), TypeId::of::<AImpl>());
-    assert_eq!(
-        builder.instance_type_name(),
-        "unit::tests::test_builder::test_type_info::AImpl"
-    );
+    assert_eq!(builder.instance_type(), TypeInfo::of::<AImpl>());
 }
 
 #[test]

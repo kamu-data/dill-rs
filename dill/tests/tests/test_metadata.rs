@@ -62,7 +62,7 @@ fn test_metadata() {
     for b in cat.builders_for::<dyn EventHandler>() {
         b.metadata(&mut |meta| {
             if let Some(meta) = meta.downcast_ref::<EventHandlerDesc>() {
-                metas.push((b.instance_type_name(), meta.event_type));
+                metas.push((b.instance_type().type_name, meta.event_type));
             }
             true
         });
@@ -96,7 +96,7 @@ fn test_metadata() {
         .builders_for_with_meta::<dyn EventHandler, _>(|desc: &EventHandlerDesc| {
             desc.event_type == "B"
         })
-        .map(|b| b.instance_type_name())
+        .map(|b| b.instance_type().type_name)
         .collect::<Vec<_>>();
 
     res.sort();
@@ -113,17 +113,24 @@ fn test_metadata() {
     struct EventHandlersForA;
 
     impl dill::DependencySpec for EventHandlersForA {
+        type IfaceType = dyn EventHandler;
         type ReturnType = Vec<std::sync::Arc<dyn EventHandler>>;
 
-        fn get(cat: &dill::Catalog) -> Result<Self::ReturnType, dill::InjectionError> {
+        fn get(
+            cat: &dill::Catalog,
+            ctx: &dill::InjectionContext,
+        ) -> Result<Self::ReturnType, dill::InjectionError> {
             cat.builders_for_with_meta::<dyn EventHandler, _>(|desc: &EventHandlerDesc| {
                 desc.event_type == "A"
             })
-            .map(|b| b.get(cat))
+            .map(|b| b.get_with_context(cat, ctx))
             .collect()
         }
 
-        fn check(_cat: &dill::Catalog) -> Result<(), dill::InjectionError> {
+        fn check(
+            _cat: &dill::Catalog,
+            _ctx: &dill::InjectionContext,
+        ) -> Result<(), dill::InjectionError> {
             unimplemented!()
         }
     }
@@ -143,7 +150,7 @@ fn test_metadata() {
         .builders_for_with_meta::<dyn EventHandler, _>(|desc: &EventHandlerDesc| {
             desc.event_type == "B"
         })
-        .map(|b| b.instance_type_name())
+        .map(|b| b.instance_type().type_name)
         .collect::<Vec<_>>();
 
     res.sort();

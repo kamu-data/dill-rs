@@ -1,6 +1,7 @@
 use std::any::{Any, TypeId};
 use std::sync::{Arc, Mutex};
 
+use crate::injection_context::InjectionContext;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -9,17 +10,21 @@ use crate::*;
 /// instances of a certain type. Builders typically create new instances for
 /// every call, delegating the lifetime management to [Scope]s,
 pub trait Builder: Send + Sync {
-    /// [`TypeId`] of the type that this builder supplies
-    fn instance_type_id(&self) -> TypeId;
+    /// [`TypeInfo`] of the type that this builder supplies
+    fn instance_type(&self) -> TypeInfo;
 
-    /// Name of the type that this builder supplies in the `mod1::mod2::Typ`
-    /// format
-    fn instance_type_name(&self) -> &'static str;
+    /// [`TypeInfo`] of the scope that caches the instances
+    fn scope_type(&self) -> TypeInfo;
 
     /// Lists interfaces that the supplied type supports. Avoid using this
     /// low-level method directly - use [`BuilderExt`] convenience methods
     /// instead.
-    fn interfaces(&self, clb: &mut dyn FnMut(&InterfaceDesc) -> bool);
+    fn interfaces(&self, clb: &mut dyn FnMut(&TypeInfo) -> bool);
+
+    /// Lists dependencies required to construct an instance. Avoid using this
+    /// low-level method directly - use [`BuilderExt`] convenience methods
+    /// instead.
+    fn dependencies(&self, clb: &mut dyn FnMut(&DependencyInfo) -> bool);
 
     /// Provider interface for accessing associated metadata. Avoid using this
     /// low-level method directly - use [`BuilderExt`] convenience methods
@@ -27,18 +32,24 @@ pub trait Builder: Send + Sync {
     fn metadata<'a>(&'a self, clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool);
 
     /// Get an instance of the supplied type
-    fn get_any(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError>;
+    fn get_any(
+        &self,
+        cat: &Catalog,
+        ctx: &InjectionContext,
+    ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError>;
 
     /// Validate the dependency tree
-    fn check(&self, cat: &Catalog) -> Result<(), ValidationError>;
+    fn check(&self, cat: &Catalog, ctx: &InjectionContext) -> Result<(), ValidationError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait BuilderExt {
-    fn interfaces_get_all(&self) -> Vec<InterfaceDesc>;
+    fn interfaces_get_all(&self) -> Vec<TypeInfo>;
     fn interfaces_contain<Iface: 'static>(&self) -> bool;
     fn interfaces_contain_type_id(&self, type_id: &TypeId) -> bool;
+
+    fn dependencies_get_all(&self) -> Vec<DependencyInfo>;
 
     fn metadata_get_first<Meta: 'static>(&self) -> Option<&Meta>;
     fn metadata_find_first<Meta: 'static>(&self, pred: impl Fn(&Meta) -> bool) -> Option<&Meta>;
@@ -48,7 +59,7 @@ pub trait BuilderExt {
 }
 
 impl<T: Builder + ?Sized> BuilderExt for T {
-    fn interfaces_get_all(&self) -> Vec<InterfaceDesc> {
+    fn interfaces_get_all(&self) -> Vec<TypeInfo> {
         let mut ret = Vec::new();
         self.interfaces(&mut |i| {
             ret.push(*i);
@@ -69,6 +80,15 @@ impl<T: Builder + ?Sized> BuilderExt for T {
                 ret = true;
                 return false;
             }
+            true
+        });
+        ret
+    }
+
+    fn dependencies_get_all(&self) -> Vec<DependencyInfo> {
+        let mut ret = Vec::new();
+        self.dependencies(&mut |i| {
+            ret.push(*i);
             true
         });
         ret
@@ -144,7 +164,17 @@ impl<T: Builder + ?Sized> BuilderExt for T {
 pub trait TypedBuilder<T: Send + Sync + ?Sized>: Builder {
     /// Called to get an instance of the component, respecting the lifetime
     /// defined by the scope
-    fn get(&self, cat: &Catalog) -> Result<Arc<T>, InjectionError>;
+    fn get(&self, cat: &Catalog) -> Result<Arc<T>, InjectionError> {
+        self.get_with_context(cat, &InjectionContext::new_root())
+    }
+
+    /// Called to get an instance of the component, respecting the lifetime
+    /// defined by the scope
+    fn get_with_context(
+        &self,
+        cat: &Catalog,
+        ctx: &InjectionContext,
+    ) -> Result<Arc<T>, InjectionError>;
 
     /// Called during registration to automatically bind this builder to all
     /// interfaces this component implements
@@ -169,10 +199,34 @@ pub trait Component {
     fn builder() -> Self::Builder;
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct InterfaceDesc {
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct TypeInfo {
     pub type_id: TypeId,
     pub type_name: &'static str,
+}
+
+impl TypeInfo {
+    pub fn of<T: ?Sized + 'static>() -> Self {
+        Self {
+            type_id: std::any::TypeId::of::<T>(),
+            type_name: std::any::type_name::<T>(),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct DependencyInfo {
+    pub type_info: TypeInfo,
+    pub spec: TypeInfo,
+}
+
+impl DependencyInfo {
+    pub fn of<T: ?Sized + 'static, Spec: DependencySpec + 'static>() -> Self {
+        Self {
+            type_info: TypeInfo::of::<T>(),
+            spec: TypeInfo::of::<Spec>(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,49 +237,61 @@ where
     Bld: TypedBuilder<Impl>,
 {
     fn without_default_interfaces(self) -> impl TypedBuilder<Impl> {
-        TypedBuilderWithoudDefaultInterfaces(self)
+        TypedBuilderWithoutDefaultInterfaces(self)
     }
 }
 
 /// A wrapper builder that stops it from auto-registering default interfaces
-pub struct TypedBuilderWithoudDefaultInterfaces<Bld>(Bld);
+pub struct TypedBuilderWithoutDefaultInterfaces<Bld>(Bld);
 
-impl<Bld> Builder for TypedBuilderWithoudDefaultInterfaces<Bld>
+impl<Bld> Builder for TypedBuilderWithoutDefaultInterfaces<Bld>
 where
     Bld: Builder,
 {
-    fn instance_type_id(&self) -> TypeId {
-        self.0.instance_type_id()
+    fn instance_type(&self) -> TypeInfo {
+        self.0.instance_type()
     }
 
-    fn instance_type_name(&self) -> &'static str {
-        self.0.instance_type_name()
+    fn scope_type(&self) -> TypeInfo {
+        self.0.scope_type()
     }
 
-    fn interfaces(&self, clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {
+    fn interfaces(&self, clb: &mut dyn FnMut(&TypeInfo) -> bool) {
         self.0.interfaces(clb);
+    }
+
+    fn dependencies(&self, clb: &mut dyn FnMut(&DependencyInfo) -> bool) {
+        self.0.dependencies(clb);
     }
 
     fn metadata<'a>(&'a self, clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {
         self.0.metadata(clb);
     }
 
-    fn get_any(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
-        self.0.get_any(cat)
+    fn get_any(
+        &self,
+        cat: &Catalog,
+        ctx: &InjectionContext,
+    ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+        self.0.get_any(cat, ctx)
     }
 
-    fn check(&self, cat: &Catalog) -> Result<(), ValidationError> {
-        self.0.check(cat)
+    fn check(&self, cat: &Catalog, ctx: &InjectionContext) -> Result<(), ValidationError> {
+        self.0.check(cat, ctx)
     }
 }
 
-impl<Bld, Impl> TypedBuilder<Impl> for TypedBuilderWithoudDefaultInterfaces<Bld>
+impl<Bld, Impl> TypedBuilder<Impl> for TypedBuilderWithoutDefaultInterfaces<Bld>
 where
     Impl: Send + Sync,
     Bld: TypedBuilder<Impl>,
 {
-    fn get(&self, cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
-        self.0.get(cat)
+    fn get_with_context(
+        &self,
+        cat: &Catalog,
+        ctx: &InjectionContext,
+    ) -> Result<Arc<Impl>, InjectionError> {
+        self.0.get_with_context(cat, ctx)
     }
 
     fn bind_interfaces(&self, _cat: &mut CatalogBuilder) {}
@@ -238,23 +304,29 @@ impl<Impl> Builder for Arc<Impl>
 where
     Impl: Send + Sync + 'static,
 {
-    fn instance_type_id(&self) -> TypeId {
-        TypeId::of::<Impl>()
+    fn instance_type(&self) -> TypeInfo {
+        TypeInfo::of::<Impl>()
     }
 
-    fn instance_type_name(&self) -> &'static str {
-        std::any::type_name::<Impl>()
+    fn scope_type(&self) -> TypeInfo {
+        TypeInfo::of::<crate::scopes::Singleton>()
     }
 
-    fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
+    fn interfaces(&self, _clb: &mut dyn FnMut(&TypeInfo) -> bool) {}
+
+    fn dependencies(&self, _clb: &mut dyn FnMut(&DependencyInfo) -> bool) {}
 
     fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn Any) -> bool) {}
 
-    fn get_any(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+    fn get_any(
+        &self,
+        _cat: &Catalog,
+        _ctx: &InjectionContext,
+    ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self.clone())
     }
 
-    fn check(&self, _cat: &Catalog) -> Result<(), ValidationError> {
+    fn check(&self, _cat: &Catalog, _ctx: &InjectionContext) -> Result<(), ValidationError> {
         Ok(())
     }
 }
@@ -263,7 +335,11 @@ impl<Impl> TypedBuilder<Impl> for Arc<Impl>
 where
     Impl: Send + Sync + 'static,
 {
-    fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
+    fn get_with_context(
+        &self,
+        _cat: &Catalog,
+        _ctx: &InjectionContext,
+    ) -> Result<Arc<Impl>, InjectionError> {
         Ok(self.clone())
     }
 
@@ -278,23 +354,29 @@ where
     Fct: Fn() -> Arc<Impl> + Send + Sync,
     Impl: Send + Sync + 'static,
 {
-    fn instance_type_id(&self) -> TypeId {
-        TypeId::of::<Impl>()
+    fn instance_type(&self) -> TypeInfo {
+        TypeInfo::of::<Impl>()
     }
 
-    fn instance_type_name(&self) -> &'static str {
-        std::any::type_name::<Impl>()
+    fn scope_type(&self) -> TypeInfo {
+        TypeInfo::of::<crate::scopes::Transient>()
     }
 
-    fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
+    fn interfaces(&self, _clb: &mut dyn FnMut(&TypeInfo) -> bool) {}
+
+    fn dependencies(&self, _clb: &mut dyn FnMut(&DependencyInfo) -> bool) {}
 
     fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn Any) -> bool) {}
 
-    fn get_any(&self, _cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+    fn get_any(
+        &self,
+        _cat: &Catalog,
+        _ctx: &InjectionContext,
+    ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self())
     }
 
-    fn check(&self, _cat: &Catalog) -> Result<(), ValidationError> {
+    fn check(&self, _cat: &Catalog, _ctx: &InjectionContext) -> Result<(), ValidationError> {
         Ok(())
     }
 }
@@ -304,7 +386,11 @@ where
     Fct: Fn() -> Arc<Impl> + Send + Sync,
     Impl: Send + Sync + 'static,
 {
-    fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
+    fn get_with_context(
+        &self,
+        _cat: &Catalog,
+        _ctx: &InjectionContext,
+    ) -> Result<Arc<Impl>, InjectionError> {
         Ok(self())
     }
 
@@ -346,23 +432,29 @@ where
     Fct: FnOnce() -> Impl + Send + Sync,
     Impl: 'static + Send + Sync,
 {
-    fn instance_type_id(&self) -> TypeId {
-        TypeId::of::<Impl>()
+    fn instance_type(&self) -> TypeInfo {
+        TypeInfo::of::<Impl>()
     }
 
-    fn instance_type_name(&self) -> &'static str {
-        std::any::type_name::<Impl>()
+    fn scope_type(&self) -> TypeInfo {
+        TypeInfo::of::<crate::scopes::Transient>()
     }
 
-    fn interfaces(&self, _clb: &mut dyn FnMut(&InterfaceDesc) -> bool) {}
+    fn interfaces(&self, _clb: &mut dyn FnMut(&TypeInfo) -> bool) {}
+
+    fn dependencies(&self, _clb: &mut dyn FnMut(&DependencyInfo) -> bool) {}
 
     fn metadata<'a>(&'a self, _clb: &mut dyn FnMut(&'a dyn Any) -> bool) {}
 
-    fn get_any(&self, cat: &Catalog) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
-        Ok(TypedBuilder::get(self, cat)?)
+    fn get_any(
+        &self,
+        cat: &Catalog,
+        ctx: &InjectionContext,
+    ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
+        Ok(TypedBuilder::get_with_context(self, cat, ctx)?)
     }
 
-    fn check(&self, _cat: &Catalog) -> Result<(), ValidationError> {
+    fn check(&self, _cat: &Catalog, _ctx: &InjectionContext) -> Result<(), ValidationError> {
         Ok(())
     }
 }
@@ -372,7 +464,11 @@ where
     Fct: FnOnce() -> Impl + Send + Sync,
     Impl: 'static + Send + Sync,
 {
-    fn get(&self, _cat: &Catalog) -> Result<Arc<Impl>, InjectionError> {
+    fn get_with_context(
+        &self,
+        _cat: &Catalog,
+        _ctx: &InjectionContext,
+    ) -> Result<Arc<Impl>, InjectionError> {
         let mut s = self.state.lock().unwrap();
         if let Some(inst) = s.instance.as_ref() {
             Ok(inst.clone())

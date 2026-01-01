@@ -235,6 +235,7 @@ fn implement_builder(
     let mut arg_prepare_dependency = Vec::new();
     let mut arg_provide_dependency = Vec::new();
     let mut arg_check_dependency = Vec::new();
+    let mut arg_dependency_info = Vec::new();
 
     for (name, typ, is_explicit) in &args {
         let (
@@ -244,6 +245,7 @@ fn implement_builder(
             prepare_dependency,
             provide_dependency,
             check_dependency,
+            dependency_info,
         ) = implement_arg(name, typ, &builder_name, *is_explicit);
 
         arg_override_fn_field.push(override_fn_field);
@@ -252,6 +254,10 @@ fn implement_builder(
         arg_prepare_dependency.push(prepare_dependency);
         arg_provide_dependency.push(provide_dependency);
         arg_check_dependency.push(check_dependency);
+
+        if !dependency_info.is_empty() {
+            arg_dependency_info.push(dependency_info);
+        }
     }
 
     let explicit_arg_decl: Vec<_> = args
@@ -323,7 +329,10 @@ fn implement_builder(
 
             #( #arg_override_setters )*
 
-            fn build(&self, cat: &::dill::Catalog) -> Result<#impl_type, ::dill::InjectionError> {
+            fn build(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<#impl_type, ::dill::InjectionError> {
+                let ctx_build = ctx.push_build(self);
+                let ctx = &ctx_build;
+
                 use ::dill::DependencySpec;
                 #( #arg_prepare_dependency )*
                 Ok(#ctor)
@@ -331,20 +340,23 @@ fn implement_builder(
         }
 
         impl ::dill::Builder for #builder_name {
-            fn instance_type_id(&self) -> ::std::any::TypeId {
-                ::std::any::TypeId::of::<#impl_type>()
+            fn instance_type(&self) -> ::dill::TypeInfo {
+                ::dill::TypeInfo::of::<#impl_type>()
             }
 
-            fn instance_type_name(&self) -> &'static str {
-                ::std::any::type_name::<#impl_type>()
+            fn scope_type(&self) -> ::dill::TypeInfo {
+                ::dill::TypeInfo::of::<#scope_type>()
             }
 
-            fn interfaces(&self, clb: &mut dyn FnMut(&::dill::InterfaceDesc) -> bool) {
+            fn interfaces(&self, clb: &mut dyn FnMut(&::dill::TypeInfo) -> bool) {
                 #(
-                    if !clb(&::dill::InterfaceDesc {
-                        type_id: ::std::any::TypeId::of::<#interfaces>(),
-                        type_name: ::std::any::type_name::<#interfaces>(),
-                    }) { return }
+                    if !clb(&::dill::TypeInfo::of::<#interfaces>()) { return }
+                )*
+            }
+
+            fn dependencies(&self, clb: &mut dyn FnMut(&::dill::DependencyInfo) -> bool) {
+                #(
+                    if !clb(& #arg_dependency_info) { return }
                 )*
             }
 
@@ -352,11 +364,11 @@ fn implement_builder(
                 #( #meta_provide )*
             }
 
-            fn get_any(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<dyn ::std::any::Any + Send + Sync>, ::dill::InjectionError> {
-                Ok(::dill::TypedBuilder::get(self, cat)?)
+            fn get_any(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<::std::sync::Arc<dyn ::std::any::Any + Send + Sync>, ::dill::InjectionError> {
+                Ok(::dill::TypedBuilder::get_with_context(self, cat, ctx)?)
             }
 
-            fn check(&self, cat: &::dill::Catalog) -> Result<(), ::dill::ValidationError> {
+            fn check(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<(), ::dill::ValidationError> {
                 use ::dill::DependencySpec;
 
                 let mut errors = Vec::new();
@@ -374,11 +386,11 @@ fn implement_builder(
         }
 
         impl ::dill::TypedBuilder<#impl_type> for #builder_name {
-            fn get(&self, cat: &::dill::Catalog) -> Result<std::sync::Arc<#impl_type>, ::dill::InjectionError> {
+            fn get_with_context(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<std::sync::Arc<#impl_type>, ::dill::InjectionError> {
                 use ::dill::Scope;
 
                 let inst = self.dill_builder_scope.get_or_create(cat, || {
-                    let inst = self.build(cat)?;
+                    let inst = self.build(cat, ctx)?;
                     Ok(::std::sync::Arc::new(inst))
                 })?;
 
@@ -400,29 +412,32 @@ fn implement_builder(
                     struct _B(#builder_name);
 
                     impl ::dill::Builder for _B {
-                        fn instance_type_id(&self) -> ::std::any::TypeId {
-                            self.0.instance_type_id()
+                        fn instance_type(&self) -> ::dill::TypeInfo {
+                            self.0.instance_type()
                         }
-                        fn instance_type_name(&self) -> &'static str {
-                            self.0.instance_type_name()
+                        fn scope_type(&self) -> ::dill::TypeInfo {
+                            self.0.scope_type()
                         }
-                        fn interfaces(&self, clb: &mut dyn FnMut(&::dill::InterfaceDesc) -> bool) {
+                        fn interfaces(&self, clb: &mut dyn FnMut(&::dill::TypeInfo) -> bool) {
                             self.0.interfaces(clb)
+                        }
+                        fn dependencies(&self, clb: &mut dyn FnMut(&::dill::DependencyInfo) -> bool) {
+                            self.0.dependencies(clb)
                         }
                         fn metadata<'a>(&'a self, clb: &mut dyn FnMut(&'a dyn std::any::Any) -> bool) {
                             self.0.metadata(clb)
                         }
-                        fn get_any(&self, cat: &::dill::Catalog) -> Result<std::sync::Arc<dyn std::any::Any + Send + Sync>, ::dill::InjectionError> {
-                            self.0.get_any(cat)
+                        fn get_any(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<std::sync::Arc<dyn std::any::Any + Send + Sync>, ::dill::InjectionError> {
+                            self.0.get_any(cat, ctx)
                         }
-                        fn check(&self, cat: &::dill::Catalog) -> Result<(), ::dill::ValidationError> {
-                            self.0.check(cat)
+                        fn check(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<(), ::dill::ValidationError> {
+                            self.0.check(cat, ctx)
                         }
                     }
 
                     impl ::dill::TypedBuilder<#interfaces> for _B {
-                        fn get(&self, cat: &::dill::Catalog) -> Result<::std::sync::Arc<#interfaces>, ::dill::InjectionError> {
-                            match self.0.get(cat) {
+                        fn get_with_context(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<::std::sync::Arc<#interfaces>, ::dill::InjectionError> {
+                            match self.0.get_with_context(cat, ctx) {
                                 Ok(v) => Ok(v),
                                 Err(e) => Err(e),
                             }
@@ -461,6 +476,7 @@ fn implement_arg(
     proc_macro2::TokenStream, // prepare_dependency
     proc_macro2::TokenStream, // provide_dependency
     proc_macro2::TokenStream, // check_dependency
+    proc_macro2::TokenStream, // dependency_info
 ) {
     let override_fn_name = format_ident!("arg_{}_fn", name);
 
@@ -476,7 +492,9 @@ fn implement_arg(
         quote! { #name: #typ }
     } else {
         match &injection_type {
-            InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
+            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
+                proc_macro2::TokenStream::new()
+            }
             _ => quote! {
                 #override_fn_name: Option<Box<dyn Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + Send + Sync>>
             },
@@ -489,7 +507,9 @@ fn implement_arg(
         quote! { #name: #name }
     } else {
         match &injection_type {
-            InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
+            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
+                proc_macro2::TokenStream::new()
+            }
             _ => quote! { #override_fn_name: None },
         }
     };
@@ -499,7 +519,9 @@ fn implement_arg(
         proc_macro2::TokenStream::new()
     } else {
         match &injection_type {
-            InjectionType::Reference { .. } => proc_macro2::TokenStream::new(),
+            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
+                proc_macro2::TokenStream::new()
+            }
             _ => {
                 let setter_val_name = format_ident!("with_{}", name);
                 let setter_fn_name = format_ident!("with_{}_fn", name);
@@ -527,7 +549,9 @@ fn implement_arg(
     } else {
         let do_check_dependency = get_do_check_dependency(&injection_type);
         match &injection_type {
-            InjectionType::Reference { .. } => quote! { #do_check_dependency },
+            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
+                quote! { #do_check_dependency }
+            }
             _ => quote! {
                 match &self.#override_fn_name {
                     Some(_) => Ok(()),
@@ -543,7 +567,9 @@ fn implement_arg(
     } else {
         let do_get_dependency = get_do_get_dependency(&injection_type);
         match &injection_type {
-            InjectionType::Reference { .. } => quote! { let #name = #do_get_dependency; },
+            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
+                quote! { let #name = #do_get_dependency; }
+            }
             _ => quote! {
                 let #name = match &self.#override_fn_name {
                     Some(fun) => fun(cat)?,
@@ -558,9 +584,18 @@ fn implement_arg(
         quote! { self.#name.clone() }
     } else {
         match &injection_type {
-            InjectionType::Reference { .. } => quote! { #name.as_ref() },
+            InjectionType::Reference { .. } => {
+                quote! { #name.as_ref() }
+            }
             _ => quote! { #name },
         }
+    };
+
+    // Called to provide dependency info metadata
+    let dependency_info = if is_explicit {
+        proc_macro2::TokenStream::new()
+    } else {
+        get_do_get_dependency_info(&injection_type)
     };
 
     (
@@ -570,6 +605,7 @@ fn implement_arg(
         prepare_dependency,
         provide_dependency,
         check_dependency,
+        dependency_info,
     )
 }
 
@@ -577,14 +613,16 @@ fn implement_arg(
 
 fn get_do_check_dependency(injection_type: &InjectionType) -> proc_macro2::TokenStream {
     match injection_type {
-        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
-        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::check(cat) },
+        InjectionType::Catalog => quote! { Ok(()) },
+        InjectionType::CatalogRef => quote! { Ok(()) },
+        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::check(cat, ctx) },
+        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::check(cat, ctx) },
         InjectionType::Option { element } => match element.as_ref() {
             InjectionType::Arc { inner } => {
-                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::check(cat) }
+                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::check(cat, ctx) }
             }
             InjectionType::Value { typ } => {
-                quote! { ::dill::Maybe::<::dill::OneOf::<#typ>>::check(cat) }
+                quote! { ::dill::Maybe::<::dill::OneOf::<#typ>>::check(cat, ctx) }
             }
             _ => {
                 unimplemented!("Currently only Option<Arc<Iface>> and Option<Value> are supported")
@@ -592,28 +630,34 @@ fn get_do_check_dependency(injection_type: &InjectionType) -> proc_macro2::Token
         },
         InjectionType::Lazy { element } => match element.as_ref() {
             InjectionType::Arc { inner } => {
-                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::check(cat) }
+                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::check(cat, ctx) }
             }
             _ => unimplemented!("Currently only Lazy<Arc<Iface>> is supported"),
         },
         InjectionType::Vec { item } => match item.as_ref() {
-            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::check(cat) },
+            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::check(cat, ctx) },
             _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
         },
-        InjectionType::Value { typ } => quote! { ::dill::OneOf::<#typ>::check(cat) },
+        InjectionType::Value { typ } => quote! { ::dill::OneOf::<#typ>::check(cat, ctx) },
     }
 }
 
 fn get_do_get_dependency(injection_type: &InjectionType) -> proc_macro2::TokenStream {
     match injection_type {
-        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::get(cat)? },
-        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::get(cat)? },
+        InjectionType::Catalog => quote! { cat.clone() },
+        InjectionType::CatalogRef => quote! { cat },
+        InjectionType::Arc { inner } => {
+            quote! { cat.get_with_context::<::dill::OneOf::<#inner>>(ctx)? }
+        }
+        InjectionType::Reference { inner } => {
+            quote! { cat.get_with_context::<::dill::OneOf::<#inner>>(ctx)? }
+        }
         InjectionType::Option { element } => match element.as_ref() {
             InjectionType::Arc { inner } => {
-                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::get(cat)? }
+                quote! { cat.get_with_context::<::dill::Maybe::<::dill::OneOf::<#inner>>>(ctx)? }
             }
             InjectionType::Value { typ } => {
-                quote! { ::dill::Maybe::<::dill::OneOf::<#typ>>::get(cat)?.map(|v| v.as_ref().clone()) }
+                quote! { cat.get_with_context::<::dill::Maybe::<::dill::OneOf::<#typ>>>(ctx)?.map(|v| v.as_ref().clone()) }
             }
             _ => {
                 unimplemented!("Currently only Option<Arc<Iface>> and Option<Value> are supported")
@@ -621,16 +665,66 @@ fn get_do_get_dependency(injection_type: &InjectionType) -> proc_macro2::TokenSt
         },
         InjectionType::Lazy { element } => match element.as_ref() {
             InjectionType::Arc { inner } => {
-                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::get(cat)? }
+                quote! { cat.get_with_context::<::dill::specs::Lazy::<::dill::OneOf::<#inner>>>(ctx)? }
             }
             _ => unimplemented!("Currently only Lazy<Arc<Iface>> is supported"),
         },
         InjectionType::Vec { item } => match item.as_ref() {
-            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::get(cat)? },
+            InjectionType::Arc { inner } => {
+                quote! { cat.get_with_context::<::dill::AllOf::<#inner>>(ctx)? }
+            }
             _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
         },
         InjectionType::Value { typ } => {
-            quote! { ::dill::OneOf::<#typ>::get(cat).map(|v| v.as_ref().clone())? }
+            quote! { cat.get_with_context::<::dill::OneOf::<#typ>>(ctx).map(|v| v.as_ref().clone())? }
+        }
+    }
+}
+
+fn get_do_get_dependency_info(injection_type: &InjectionType) -> proc_macro2::TokenStream {
+    match injection_type {
+        InjectionType::Catalog | InjectionType::CatalogRef => {
+            quote! { ::dill::DependencyInfo::of::<::dill::Catalog, ::dill::specs::OneOf::<::dill::Catalog>>() }
+        }
+        InjectionType::Arc { inner } => quote! {
+            ::dill::DependencyInfo::of::<#inner, ::dill::specs::OneOf::<#inner>>()
+        },
+        InjectionType::Reference { inner } => quote! {
+            ::dill::DependencyInfo::of::<#inner, ::dill::specs::OneOf::<#inner>>()
+        },
+        InjectionType::Option { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! {
+                    ::dill::DependencyInfo::of::<#inner, ::dill::specs::Maybe::<::dill::OneOf::<#inner>>>()
+                }
+            }
+            InjectionType::Value { typ } => {
+                quote! {
+                    ::dill::DependencyInfo::of::<#typ, ::dill::specs::Maybe::<::dill::OneOf::<#typ>>>()
+                }
+            }
+            _ => {
+                unimplemented!("Currently only Option<Arc<Iface>> and Option<Value> are supported")
+            }
+        },
+        InjectionType::Lazy { element } => match element.as_ref() {
+            InjectionType::Arc { inner } => {
+                quote! {
+                    ::dill::DependencyInfo::of::<#inner, ::dill::specs::Lazy::<::dill::OneOf::<#inner>>>()
+                }
+            }
+            _ => unimplemented!("Currently only Lazy<Arc<Iface>> is supported"),
+        },
+        InjectionType::Vec { item } => match item.as_ref() {
+            InjectionType::Arc { inner } => quote! {
+                ::dill::DependencyInfo::of::<#inner, ::dill::specs::AllOf::<#inner>>()
+            },
+            _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
+        },
+        InjectionType::Value { typ } => {
+            quote! {
+                ::dill::DependencyInfo::of::<#typ, ::dill::specs::OneOf::<#typ>>()
+            }
         }
     }
 }

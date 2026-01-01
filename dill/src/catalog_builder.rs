@@ -6,6 +6,7 @@ use std::sync::Arc;
 use multimap::MultiMap;
 
 use super::catalog::*;
+use crate::injection_context::InjectionContext;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -183,7 +184,7 @@ impl CatalogBuilder {
         // TODO: Avoid allocations when constructing a temporary catalog
         let cat = self.build();
         for builder in cat.builders() {
-            if let Err(mut err) = builder.check(&cat) {
+            if let Err(mut err) = builder.check(&cat, &InjectionContext::new_root()) {
                 errors.append(&mut err.errors);
             }
         }

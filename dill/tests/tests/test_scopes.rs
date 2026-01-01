@@ -263,7 +263,7 @@ fn test_scope_transaction() {
 
     impl B for BImpl {
         fn test(&self) -> String {
-            format!("{}", self.name.lock().unwrap().as_str())
+            self.name.lock().unwrap().to_string()
         }
     }
 

@@ -8,7 +8,16 @@ fn test_one_of_unregistered() {
     let cat = CatalogBuilder::new().build();
 
     let res = cat.get::<OneOf<i32>>();
-    assert_matches!(res, Err(e) if e == InjectionError::unregistered::<i32>());
+    pretty_assertions::assert_eq!(
+        res.err().unwrap().to_string(),
+        indoc::indoc!(
+            r#"
+            Unregistered type: i32
+            Injection stack:
+              0: Resolve: dill::specs::OneOf<i32>
+            "#
+        )
+    );
 }
 
 #[test]
@@ -162,7 +171,19 @@ fn test_one_of_with_dependency_missing() {
         .build();
 
     let res = cat.get::<OneOf<dyn A>>();
-    assert_matches!(res.err(), Some(e) if e == InjectionError::unregistered::<dyn B>());
+    let err = res.err().unwrap();
+    pretty_assertions::assert_eq!(
+        format!("{err}"),
+        indoc::indoc!(
+            r#"
+            Unregistered type: dyn unit::tests::test_specs::test_one_of_with_dependency_missing::B
+            Injection stack:
+              0: Resolve: dill::specs::OneOf<dyn unit::tests::test_specs::test_one_of_with_dependency_missing::A>
+              1: Build:   unit::tests::test_specs::test_one_of_with_dependency_missing::AImpl <dill::scopes::Transient>
+              2: Resolve: dill::specs::OneOf<dyn unit::tests::test_specs::test_one_of_with_dependency_missing::B>
+            "#
+        )
+    );
 }
 
 #[test]

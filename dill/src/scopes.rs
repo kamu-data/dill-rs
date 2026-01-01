@@ -108,8 +108,14 @@ pub struct Cached<T: Cache> {
 
 impl<T: Cache> Cached<T> {
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<T: Cache> Default for Cached<T> {
+    fn default() -> Self {
         Self {
-            _ph: PhantomData::default(),
+            _ph: Default::default(),
         }
     }
 }
@@ -181,11 +187,12 @@ pub type Transaction = Cached<TransactionCache>;
 
 /// Just a newtype wrapper for [`CacheImpl`] to give it a specific type
 /// identity. Used by [`Transaction`] scope.
+#[derive(Default)]
 pub struct TransactionCache(crate::cache::CacheImpl);
 
 impl TransactionCache {
     pub fn new() -> Self {
-        Self(crate::cache::CacheImpl::new())
+        Self::default()
     }
 }
 
