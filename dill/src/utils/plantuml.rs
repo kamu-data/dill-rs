@@ -17,19 +17,19 @@ fn get_type_package(_i: &TypeInfo) -> Option<String> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn get_type_name(i: &TypeInfo) -> String {
-    let iang = i.type_name.find('<').unwrap_or(i.type_name.len());
-    let icol = i.type_name[0..iang].rfind("::").map(|i| i + 2).unwrap_or(0);
+    let iang = i.name.find('<').unwrap_or(i.name.len());
+    let icol = i.name[0..iang].rfind("::").map(|i| i + 2).unwrap_or(0);
 
-    format!("\"{}\"", &i.type_name[icol..iang])
+    format!("\"{}\"", &i.name[icol..iang])
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn get_type_scope(i: &TypeInfo) -> String {
-    let name = if i.type_id == std::any::TypeId::of::<Transient>() {
+    let name = if i.id == std::any::TypeId::of::<Transient>() {
         "".to_string()
     } else {
-        i.type_name.to_lowercase().replace("dill::scopes::", "")
+        i.name.to_lowercase().replace("dill::scopes::", "")
     };
 
     if name.is_empty() {
@@ -44,8 +44,8 @@ fn get_type_scope(i: &TypeInfo) -> String {
 fn get_spec_name(i: &DependencyInfo) -> String {
     let spec = i
         .spec
-        .type_name
-        .replace(i.type_info.type_name, "")
+        .name
+        .replace(i.iface.name, "")
         .replace("dill::specs::", "");
 
     let s = match spec.as_str() {
@@ -135,16 +135,16 @@ pub fn render(cat: &Catalog) -> String {
     }
 
     let mut builders: Vec<_> = cat.builders().collect();
-    builders.sort_by_key(|b| b.instance_type().type_name);
+    builders.sort_by_key(|b| b.instance_type().name);
 
     for b in &builders {
         let inst = b.instance_type();
 
         let mut ifaces = b.interfaces_get_all();
-        ifaces.sort_by_key(|i| i.type_name);
+        ifaces.sort_by_key(|i| i.name);
 
         let mut deps = b.dependencies_get_all();
-        deps.sort_by_key(|i| i.type_info.type_name);
+        deps.sort_by_key(|i| i.iface.name);
 
         for iface in &ifaces {
             writeln!(s, "{} <|-- {}", get_type_name(iface), get_type_name(&inst)).unwrap();
@@ -156,7 +156,7 @@ pub fn render(cat: &Catalog) -> String {
                 "{} {} --> {}",
                 get_type_name(&inst),
                 get_spec_name(dep),
-                get_type_name(&dep.type_info)
+                get_type_name(&dep.iface)
             )
             .unwrap();
         }

@@ -1,8 +1,8 @@
-use std::any::{TypeId, type_name};
+use std::any::TypeId;
 
 use thiserror::Error;
 
-use crate::{InjectionContext, InjectionStack};
+use crate::{DependencyInfo, InjectionContext, InjectionStack, TypeInfo};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -12,6 +12,8 @@ pub enum InjectionError {
     Unregistered(UnregisteredTypeError),
     #[error(transparent)]
     Ambiguous(AmbiguousTypeError),
+    #[error(transparent)]
+    ScopeInversion(Box<ScopeInversionError>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,8 +21,7 @@ pub enum InjectionError {
 impl InjectionError {
     pub fn unregistered<Iface: 'static + ?Sized>(ctx: &InjectionContext) -> Self {
         Self::Unregistered(UnregisteredTypeError {
-            type_id: TypeId::of::<Iface>(),
-            type_name: type_name::<Iface>(),
+            dep_type: TypeInfo::of::<Iface>(),
             injection_stack: ctx.to_stack(),
         })
     }
@@ -28,8 +29,7 @@ impl InjectionError {
     // TODO: Should contain information about which implementations were found
     pub fn ambiguous<Iface: 'static + ?Sized>(ctx: &InjectionContext) -> Self {
         Self::Ambiguous(AmbiguousTypeError {
-            type_id: TypeId::of::<Iface>(),
-            type_name: type_name::<Iface>(),
+            dep_type: TypeInfo::of::<Iface>(),
             injection_stack: ctx.to_stack(),
         })
     }
@@ -38,21 +38,55 @@ impl InjectionError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug, Clone)]
-#[error("Unregistered type: {type_name}\nInjection stack:\n{injection_stack}")]
 pub struct UnregisteredTypeError {
-    pub type_id: TypeId,
-    pub type_name: &'static str,
+    pub dep_type: TypeInfo,
     pub injection_stack: InjectionStack,
+}
+
+impl std::fmt::Display for UnregisteredTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Unregistered type: {}", self.dep_type.name)?;
+        write!(f, "Injection stack:\n{}", self.injection_stack)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug, Clone)]
-#[error("Ambiguous type: {type_name}\nInjection stack:\n{injection_stack}")]
 pub struct AmbiguousTypeError {
-    pub type_id: TypeId,
-    pub type_name: &'static str,
+    pub dep_type: TypeInfo,
     pub injection_stack: InjectionStack,
+}
+
+impl std::fmt::Display for AmbiguousTypeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Ambiguous type: {}", self.dep_type.name)?;
+        write!(f, "Injection stack:\n{}", self.injection_stack)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug, Clone)]
+pub struct ScopeInversionError {
+    pub inst_type: TypeInfo,
+    pub inst_scope: TypeInfo,
+    pub inst_dep: DependencyInfo,
+    pub dep_type: TypeInfo,
+    pub dep_scope: TypeInfo,
+    pub injection_stack: InjectionStack,
+}
+
+impl std::fmt::Display for ScopeInversionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Scope inversion: {} in {} scope injects {} in {} scope",
+            self.inst_type.name, self.inst_scope.name, self.dep_type.name, self.dep_scope.name,
+        )?;
+
+        write!(f, "Injection stack:\n{}", self.injection_stack)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,8 +116,9 @@ impl ValidationErrorExt for Result<(), ValidationError> {
         let Err(mut err) = self else { return Ok(()) };
 
         err.errors.retain(|e| match e {
-            InjectionError::Unregistered(e) => e.type_id != type_id,
-            InjectionError::Ambiguous(e) => e.type_id != type_id,
+            InjectionError::Unregistered(e) => e.dep_type.id != type_id,
+            InjectionError::Ambiguous(e) => e.dep_type.id != type_id,
+            InjectionError::ScopeInversion(e) => e.dep_type.id != type_id,
         });
 
         if err.errors.is_empty() {

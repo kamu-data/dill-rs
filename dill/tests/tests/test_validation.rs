@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use dill::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_validate_static_graph() {
     trait A: Send + Sync {
@@ -42,14 +44,11 @@ fn test_validate_static_graph() {
     let res = b.validate();
     assert_matches!(
         &res,
-        Err(ValidationError { errors }) if errors.len() == 1
-    );
-
-    let err = &res.err().unwrap().errors[0];
-    assert_matches!(
-        err,
-        InjectionError::Unregistered(u)
-        if u.type_name == "dyn unit::tests::test_validation::test_validate_static_graph::B"
+        Err(ValidationError { errors }) if matches!(
+            &errors[..],
+            [InjectionError::Unregistered(u)]
+            if u.dep_type.name == "dyn unit::tests::test_validation::test_validate_static_graph::B"
+        )
     );
 
     // Consider B is registered dynamically
@@ -67,8 +66,25 @@ fn test_validate_static_graph() {
     cat.get_one::<dyn A>().unwrap();
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
-fn test_validate_ignores_bound_fields() {
+fn test_validate_optional() {
+    #[allow(dead_code)]
+    #[component]
+    struct A {
+        foo: Option<i32>,
+    }
+
+    let mut b = Catalog::builder();
+    b.add::<A>();
+    b.validate().unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_validate_bound_fields() {
     trait A: Send + Sync {}
 
     #[allow(dead_code)]
@@ -84,6 +100,8 @@ fn test_validate_ignores_bound_fields() {
 
     b.validate().unwrap();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_validate_catalog_inject() {
@@ -108,3 +126,108 @@ fn test_validate_catalog_inject() {
 
     b.validate().unwrap();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_validate_scope_inversion_transient_in_singleton() {
+    #[dill::component]
+    #[dill::scope(dill::scopes::Singleton)]
+    struct A {
+        #[allow(dead_code)]
+        b: Arc<B>,
+    }
+
+    #[dill::component]
+    struct B;
+
+    let mut b = CatalogBuilder::new();
+    b.add::<A>();
+    b.add::<B>();
+
+    let res = b.validate();
+    assert_matches!(
+        &res,
+        Err(ValidationError { errors }) if matches!(
+            &errors[..],
+            [InjectionError::ScopeInversion(..)],
+        )
+    );
+
+    pretty_assertions::assert_eq!(
+        res.err().unwrap().errors[0].to_string(),
+        indoc::indoc!(
+            r#"
+            Scope inversion: unit::tests::test_validation::test_validate_scope_inversion_transient_in_singleton::A in dill::scopes::Singleton scope injects unit::tests::test_validation::test_validate_scope_inversion_transient_in_singleton::B in dill::scopes::Transient scope
+            Injection stack:
+              0: Build:   unit::tests::test_validation::test_validate_scope_inversion_transient_in_singleton::A <dill::scopes::Singleton>
+              1: Resolve: dill::specs::OneOf<unit::tests::test_validation::test_validate_scope_inversion_transient_in_singleton::B>
+            "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_validate_scope_inversion_agnostic_in_singleton() {
+    #[dill::component]
+    #[dill::scope(dill::scopes::Singleton)]
+    struct A {
+        #[allow(dead_code)]
+        b: Arc<B>,
+    }
+
+    #[dill::component]
+    #[dill::scope(dill::scopes::Agnostic)]
+    struct B;
+
+    let mut b = CatalogBuilder::new();
+    b.add::<A>();
+    b.add::<B>();
+
+    b.validate().unwrap();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_validate_scope_inversion_tx_in_singleton() {
+    #[dill::component]
+    #[dill::scope(dill::scopes::Singleton)]
+    struct A {
+        #[allow(dead_code)]
+        b: Arc<B>,
+    }
+
+    #[dill::component]
+    #[dill::scope(dill::scopes::Transaction)]
+    struct B;
+
+    let mut b = CatalogBuilder::new();
+    b.add::<A>();
+    b.add::<B>();
+
+    let res = b.validate();
+    assert_matches!(
+        &res,
+        Err(ValidationError { errors }) if matches!(
+            &errors[..],
+            [InjectionError::ScopeInversion(_)],
+        )
+    );
+
+    pretty_assertions::assert_eq!(
+        res.err().unwrap().errors[0].to_string(),
+        indoc::indoc!(
+            r#"
+            Scope inversion: unit::tests::test_validation::test_validate_scope_inversion_tx_in_singleton::A in dill::scopes::Singleton scope injects unit::tests::test_validation::test_validate_scope_inversion_tx_in_singleton::B in dill::scopes::Cached<dill::scopes::TransactionCache> scope
+            Injection stack:
+              0: Build:   unit::tests::test_validation::test_validate_scope_inversion_tx_in_singleton::A <dill::scopes::Singleton>
+              1: Resolve: dill::specs::OneOf<unit::tests::test_validation::test_validate_scope_inversion_tx_in_singleton::B>
+            "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

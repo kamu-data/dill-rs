@@ -6,8 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
+- `InjectionError` now comes with an `InjectionStack` that explains the resolution and construction path that resulted in error
+- New dependency introspection system for `Builder` makes it easier to statically analyze the dependency tree, unlocking new validation types and visualizations
+- New `Agnostic` scope acts the same as the default `Transient` scope, but signals to validation that it's OK to inject instances of this scope into long-lived objects, like those governed by `Singleton` scope
 - New `Transaction` scope allows to cache and reuse instances within a scope defined by the lifetime of a chained `Catalog`
+- New `utils::graphviz` and `utils::plantuml` modules allow visualizing the dependency tree
 ### Changed
+- Validation will return errors for scope inversions, e.g. in case when a `Transient` component is injected into `Singleton` scope and therefore will live longer than it may be expected
 - Improved `Scope` interface to avoid excessive locking and lookups
 
 ## [0.14.0] - 2025-05-26

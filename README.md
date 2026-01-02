@@ -12,8 +12,6 @@
   </p>
 </div>
 
-This crate is still in early stages and needs a lot of work, BUT it's [in active use in `kamu-cli`](https://github.com/kamu-data/kamu-cli/blob/601572a00702d15f630738b5fcad50ecafaed816/kamu-cli/src/app.rs#L89-L146) - a fairly large project organized according to [Onion/Clean Architecture](https://herbertograca.com/2017/11/16/explicit-architecture-01-ddd-hexagonal-onion-clean-cqrs-how-i-put-it-all-together/). We are continuing to improve this crate as we go and encounter more sophisticated DI scenarios.
-
 
 # Example
 
@@ -26,7 +24,8 @@ trait A: Send + Sync {
 }
 
 // Implement traits to define components
-#[component]
+#[dill::component]
+#[dill::interface(dyn A)]
 struct AImpl {
     // Auto-inject dependencies (also supports by-value)
     b: Arc<dyn B>,
@@ -44,7 +43,8 @@ trait B: Send + Sync {
     fn test(&self) -> String;
 }
 
-#[component]
+#[dill::component]
+#[dill::interface(dyn B)]
 struct BImpl;
 
 impl B for BImpl {
@@ -55,18 +55,19 @@ impl B for BImpl {
 
 /////////////////////////////////////////
 
-// Register interfaces and bind them to implementations
+// Register components
 let cat = Catalog::builder()
     .add::<AImpl>()
-    .bind::<dyn A, AImpl>()
     .add::<BImpl>()
-    .bind::<dyn B, BImpl>()
     .build();
 
 // Get objects and have their deps satisfied automatically
 let inst = cat.get::<OneOf<dyn A>>().unwrap();
 assert_eq!(inst.test(), "aimpl::bimpl");
 ```
+
+# Status
+While documentation is still lacking, this crate is production-ready and is [in active use in `kamu-cli`](https://github.com/kamu-data/kamu-cli/blob/601572a00702d15f630738b5fcad50ecafaed816/kamu-cli/src/app.rs#L89-L146) - a fairly large project organized according to [Onion/Clean Architecture](https://herbertograca.com/2017/11/16/explicit-architecture-01-ddd-hexagonal-onion-clean-cqrs-how-i-put-it-all-together/).
 
 
 # Features
@@ -76,8 +77,10 @@ assert_eq!(inst.test(), "aimpl::bimpl");
   - `Maybe<Spec>` - returns `None` if inner `Spec` cannot be resolved
   - `Lazy<Spec>` - injects an object that delays the creation of value until it is requested
 - Component scopes:
-  - `Transient` (default) - a new instance is created for every invocation
+  - `Transient` (default) - short-lived, a new instance is created for every invocation
+  - `Agnostic` - same as `Transient` but signals that it's OK to inject this instance into more long-lived scopes
   - `Singleton` - an instance is created upon first use and then reused for the rest of calls
+  - `Transaction` - an instance will be cached for the duration of a transaction
 - `#[component]` macro can derive `Builder`:
   - When used directly for a `struct` or on `impl` block with `Impl::new()` function
   - Can inject as `Arc<T>`, `T: Clone`, `&T`
@@ -90,7 +93,10 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 - By value injection of `Clone` types
 - `Catalog` can be self-injected
 - Chaining of `Catalog`s allows adding values dynamically (e.g. in middleware chains like `tower`)
+- `CatalogBuilder::validate()` performs static analysis to detect dangling and ambiguous dependencies and scope inversion issues
 - `Catalog` can be scoped within a `tokio` task as "current" to override the source of `Lazy`ly injected values
+- Utils:
+  - `dill::utils::graphviz` and `dill::utils::plantuml` allow visualizing the dependency graph
 
 
 # Design Principles
@@ -112,28 +118,14 @@ assert_eq!(inst.test(), "aimpl::bimpl");
 
 # TODO
 - Support `stable` rust
-- Support builders providing own interface lists (default bindings)
-- Improve graph validation
 - Make `Scope`s external to `Builder`s so they could be overridden
-- Allow dynamic registration (without cloning entire catalogs)
 - Consider using traits to map `Arc`, `Option`, `Vec` to dependency specs instead of relying on macro magic
 - Add `trybuild` tests (see https://youtu.be/geovSK3wMB8?t=956)
 - Support generic types
 - Replace `add_*` with generic `add<B: Into<Builder>>`
 - value by reference in `new()`
 - + Send + Sync plague  https://www.reddit.com/r/rust/comments/6dz0xh/abstracting_over_reference_counted_types_rc_and/
-- Add low-overhead resolution stack to errors (e.g. populated on unwind)
-- Extra scopes
-  - invocation
-  - thread
-  - task
-  - catalog?
-- thread safety
-- externally defined types
-- custom builders
-- error handling
 - doctests
-- improve catalog fluent interface (or macro?)
 - proc macro error handling
 - build a type without registering
 - Support PImpl idiom, where `Arc<dyn Iface>` can be hidden behind a movable object

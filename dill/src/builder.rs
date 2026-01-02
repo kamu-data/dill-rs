@@ -37,9 +37,6 @@ pub trait Builder: Send + Sync {
         cat: &Catalog,
         ctx: &InjectionContext,
     ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError>;
-
-    /// Validate the dependency tree
-    fn check(&self, cat: &Catalog, ctx: &InjectionContext) -> Result<(), ValidationError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +73,7 @@ impl<T: Builder + ?Sized> BuilderExt for T {
     fn interfaces_contain_type_id(&self, type_id: &TypeId) -> bool {
         let mut ret = false;
         self.interfaces(&mut |i| {
-            if i.type_id == *type_id {
+            if i.id == *type_id {
                 ret = true;
                 return false;
             }
@@ -201,31 +198,37 @@ pub trait Component {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TypeInfo {
-    pub type_id: TypeId,
-    pub type_name: &'static str,
+    pub id: TypeId,
+    pub name: &'static str,
 }
 
 impl TypeInfo {
     pub fn of<T: ?Sized + 'static>() -> Self {
         Self {
-            type_id: std::any::TypeId::of::<T>(),
-            type_name: std::any::type_name::<T>(),
+            id: std::any::TypeId::of::<T>(),
+            name: std::any::type_name::<T>(),
         }
     }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct DependencyInfo {
-    pub type_info: TypeInfo,
+    pub iface: TypeInfo,
     pub spec: TypeInfo,
+    pub is_bound: bool,
 }
 
 impl DependencyInfo {
     pub fn of<T: ?Sized + 'static, Spec: DependencySpec + 'static>() -> Self {
         Self {
-            type_info: TypeInfo::of::<T>(),
+            iface: TypeInfo::of::<T>(),
             spec: TypeInfo::of::<Spec>(),
+            is_bound: false,
         }
+    }
+
+    pub fn bound(self, is_bound: bool) -> Self {
+        Self { is_bound, ..self }
     }
 }
 
@@ -275,10 +278,6 @@ where
     ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         self.0.get_any(cat, ctx)
     }
-
-    fn check(&self, cat: &Catalog, ctx: &InjectionContext) -> Result<(), ValidationError> {
-        self.0.check(cat, ctx)
-    }
 }
 
 impl<Bld, Impl> TypedBuilder<Impl> for TypedBuilderWithoutDefaultInterfaces<Bld>
@@ -325,10 +324,6 @@ where
     ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self.clone())
     }
-
-    fn check(&self, _cat: &Catalog, _ctx: &InjectionContext) -> Result<(), ValidationError> {
-        Ok(())
-    }
 }
 
 impl<Impl> TypedBuilder<Impl> for Arc<Impl>
@@ -374,10 +369,6 @@ where
         _ctx: &InjectionContext,
     ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(self())
-    }
-
-    fn check(&self, _cat: &Catalog, _ctx: &InjectionContext) -> Result<(), ValidationError> {
-        Ok(())
     }
 }
 
@@ -452,10 +443,6 @@ where
         ctx: &InjectionContext,
     ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         Ok(TypedBuilder::get_with_context(self, cat, ctx)?)
-    }
-
-    fn check(&self, _cat: &Catalog, _ctx: &InjectionContext) -> Result<(), ValidationError> {
-        Ok(())
     }
 }
 

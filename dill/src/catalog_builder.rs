@@ -170,40 +170,121 @@ impl CatalogBuilder {
     ///  .unwrap();
     /// ```
     pub fn validate(&mut self) -> Result<(), ValidationError> {
-        // TODO: Should return a validation report type that will track
-        // - Unresolved dependencies
-        // - Ambiguous dependencies
-        // - Missing dependencies with defaults
-        // - AllOf that don't resolve to anything
-        //
-        // Users will then be able to specify whether to treat them as errors / warnings
-        // or have them ignored.
+        const SCOPE_COMPAT: [TypeId; 4] = [
+            TypeId::of::<Agnostic>(),
+            TypeId::of::<Transient>(),
+            TypeId::of::<Transaction>(),
+            TypeId::of::<Singleton>(),
+        ];
+
+        let get_binding = |t: &IfaceTypeId| {
+            if let Some(v) = self.bindings.get(t) {
+                return Some(v);
+            }
+
+            let mut chained = self.chained_catalog.as_ref();
+            while let Some(c) = chained {
+                if let Some(v) = c.0.bindings.get(t) {
+                    return Some(v);
+                }
+                chained = c.0.chained_catalog.as_ref();
+            }
+            None
+        };
 
         let mut errors = Vec::new();
+        let mut validated = std::collections::HashSet::<TypeId>::new();
 
-        // TODO: Avoid allocations when constructing a temporary catalog
-        let cat = self.build();
-        for builder in cat.builders() {
-            if let Err(mut err) = builder.check(&cat, &InjectionContext::new_root()) {
-                errors.append(&mut err.errors);
+        for b in self.builders.values() {
+            let inst = b.instance_type();
+            let inst_scope = b.scope_type();
+
+            if validated.contains(&inst.id) {
+                continue;
             }
+
+            for dep in b.dependencies_get_all() {
+                if dep.is_bound {
+                    // OK: provided explicitly
+                } else if let Some(bind) = get_binding(&IfaceTypeId(dep.iface.id)) {
+                    let dep_scope = bind.builder.scope_type();
+
+                    if dep_scope.id == TypeId::of::<Agnostic>() {
+                        // OK: Agnostic is safe to inject in any scope
+                        continue;
+                    }
+
+                    // TODO: Make scope compatibility checks more robust
+                    let i = SCOPE_COMPAT
+                        .iter()
+                        .position(|t| *t == inst_scope.id)
+                        .unwrap();
+                    let d = SCOPE_COMPAT
+                        .iter()
+                        .position(|t| *t == dep_scope.id)
+                        .unwrap();
+
+                    if i > d {
+                        let err = InjectionError::ScopeInversion(Box::new(ScopeInversionError {
+                            inst_type: inst,
+                            inst_scope,
+                            inst_dep: dep,
+                            dep_type: bind.builder.instance_type(),
+                            dep_scope,
+                            injection_stack: InjectionContext::new_root()
+                                .push_build(b.as_ref())
+                                .push(InjectionStackFrame::Resolve {
+                                    spec: dep.spec,
+                                    iface: dep.iface,
+                                })
+                                .to_stack(),
+                        }));
+                        errors.push(err);
+                    }
+                } else if dep.iface.id == TypeId::of::<Catalog>() {
+                    // OK: self-injection of a catalog
+                } else {
+                    // TODO: Make spec identification more robust
+                    let spec = dep
+                        .spec
+                        .name
+                        .replace(dep.iface.name, "")
+                        .replace("dill::specs::", "");
+                    match spec.as_str() {
+                        "Maybe<OneOf<>>" | "AllOf<>" => {
+                            // OK: dependency is optional
+                        }
+                        _ => {
+                            let err = InjectionError::Unregistered(UnregisteredTypeError {
+                                dep_type: dep.iface,
+                                injection_stack: InjectionContext::new_root()
+                                    .push_build(b.as_ref())
+                                    .push(InjectionStackFrame::Resolve {
+                                        spec: dep.spec,
+                                        iface: dep.iface,
+                                    })
+                                    .to_stack(),
+                            });
+                            errors.push(err);
+                        }
+                    }
+                }
+            }
+
+            validated.insert(inst.id);
         }
 
         // Sort and deduplicate by type
         errors.sort_by_key(|e| match e {
-            InjectionError::Unregistered(err) => err.type_id,
-            InjectionError::Ambiguous(err) => err.type_id,
+            InjectionError::Unregistered(err) => err.dep_type.id,
+            InjectionError::Ambiguous(err) => err.dep_type.id,
+            InjectionError::ScopeInversion(err) => err.dep_type.id,
         });
         errors.dedup_by_key(|e| match e {
-            InjectionError::Unregistered(err) => err.type_id,
-            InjectionError::Ambiguous(err) => err.type_id,
+            InjectionError::Unregistered(err) => err.dep_type.id,
+            InjectionError::Ambiguous(err) => err.dep_type.id,
+            InjectionError::ScopeInversion(err) => err.dep_type.id,
         });
-
-        // Return builder to its original state
-        let mut cat = Arc::into_inner(cat.0).unwrap();
-        std::mem::swap(&mut self.builders, &mut cat.builders);
-        std::mem::swap(&mut self.bindings, &mut cat.bindings);
-        self.chained_catalog = cat.chained_catalog.take();
 
         if !errors.is_empty() {
             Err(ValidationError { errors })

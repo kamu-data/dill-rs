@@ -15,24 +15,25 @@ impl<'a> InjectionContext<'a> {
         }
     }
 
-    pub fn push_resolve<Spec: DependencySpec + 'static>(&'a self) -> InjectionContext<'a> {
+    pub fn push(&'a self, frame: InjectionStackFrame) -> InjectionContext<'a> {
         InjectionContext {
-            frame: Some(InjectionStackFrame::Resolve {
-                spec_type: TypeInfo::of::<Spec>(),
-                iface_type: TypeInfo::of::<Spec::IfaceType>(),
-            }),
+            frame: Some(frame),
             prev: Some(self),
         }
     }
 
+    pub fn push_resolve<Spec: DependencySpec + 'static>(&'a self) -> InjectionContext<'a> {
+        self.push(InjectionStackFrame::Resolve {
+            iface: TypeInfo::of::<Spec::IfaceType>(),
+            spec: TypeInfo::of::<Spec>(),
+        })
+    }
+
     pub fn push_build(&'a self, b: &dyn Builder) -> InjectionContext<'a> {
-        InjectionContext {
-            frame: Some(InjectionStackFrame::Build {
-                instance_type: b.instance_type(),
-                scope_type: b.scope_type(),
-            }),
-            prev: Some(self),
-        }
+        self.push(InjectionStackFrame::Build {
+            instance: b.instance_type(),
+            scope: b.scope_type(),
+        })
     }
 
     pub fn to_stack(&self) -> InjectionStack {
@@ -57,35 +58,19 @@ pub struct InjectionStack {
 
 #[derive(Clone, Debug)]
 pub enum InjectionStackFrame {
-    Resolve {
-        spec_type: TypeInfo,
-        iface_type: TypeInfo,
-    },
-    Build {
-        instance_type: TypeInfo,
-        scope_type: TypeInfo,
-    },
+    Resolve { iface: TypeInfo, spec: TypeInfo },
+    Build { instance: TypeInfo, scope: TypeInfo },
 }
 
 impl std::fmt::Display for InjectionStack {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (line, frame) in self.frames.iter().rev().enumerate() {
             match frame {
-                InjectionStackFrame::Resolve {
-                    spec_type,
-                    iface_type: _,
-                } => {
-                    writeln!(f, "  {line}: Resolve: {}", spec_type.type_name)?;
+                InjectionStackFrame::Resolve { iface: _, spec } => {
+                    writeln!(f, "  {line}: Resolve: {}", spec.name)?;
                 }
-                InjectionStackFrame::Build {
-                    instance_type,
-                    scope_type,
-                } => {
-                    writeln!(
-                        f,
-                        "  {line}: Build:   {} <{}>",
-                        instance_type.type_name, scope_type.type_name
-                    )?;
+                InjectionStackFrame::Build { instance, scope } => {
+                    writeln!(f, "  {line}: Build:   {} <{}>", instance.name, scope.name)?;
                 }
             }
         }

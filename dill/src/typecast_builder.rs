@@ -26,8 +26,8 @@ pub struct TypecastBuilder<'a, Iface>
 where
     Iface: 'static + ?Sized,
 {
-    pub(crate) builder: &'a Arc<dyn Builder>,
-    pub(crate) caster: &'a TypeCaster<Iface>,
+    builder: &'a dyn Builder,
+    caster: &'a TypeCaster<Iface>,
 }
 
 impl<Iface> Builder for TypecastBuilder<'_, Iface>
@@ -61,17 +61,13 @@ where
     ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError> {
         self.builder.get_any(cat, ctx)
     }
-
-    fn check(&self, cat: &Catalog, ctx: &InjectionContext) -> Result<(), ValidationError> {
-        self.builder.check(cat, ctx)
-    }
 }
 
 impl<'a, Iface> TypecastBuilder<'a, Iface>
 where
     Iface: 'static + ?Sized,
 {
-    fn new(builder: &'a Arc<dyn Builder>, caster: &'a TypeCaster<Iface>) -> Self {
+    fn new(builder: &'a dyn Builder, caster: &'a TypeCaster<Iface>) -> Self {
         Self { builder, caster }
     }
 
@@ -127,7 +123,7 @@ impl<'a, Iface: 'static + ?Sized> Iterator for TypecastBuilderIterator<'a, Iface
             // SAFETY: the TypeID key of the `bindings` map is guaranteed to match the
             // `Iface` type
             let caster: &TypeCaster<Iface> = b.caster.downcast_ref().unwrap();
-            return Some(TypecastBuilder::new(&b.builder, caster));
+            return Some(TypecastBuilder::new(b.builder.as_ref(), caster));
         }
         None
     }
@@ -175,7 +171,7 @@ where
                     // SAFETY: the TypeID key of the `bindings` map is guaranteed to match the
                     // `Iface` type
                     let caster: &TypeCaster<Iface> = b.caster.downcast_ref().unwrap();
-                    return Some(TypecastBuilder::new(&b.builder, caster));
+                    return Some(TypecastBuilder::new(b.builder.as_ref(), caster));
                 }
             }
         }

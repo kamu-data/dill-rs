@@ -234,7 +234,6 @@ fn implement_builder(
     let mut arg_override_setters = Vec::new();
     let mut arg_prepare_dependency = Vec::new();
     let mut arg_provide_dependency = Vec::new();
-    let mut arg_check_dependency = Vec::new();
     let mut arg_dependency_info = Vec::new();
 
     for (name, typ, is_explicit) in &args {
@@ -244,7 +243,6 @@ fn implement_builder(
             override_setters,
             prepare_dependency,
             provide_dependency,
-            check_dependency,
             dependency_info,
         ) = implement_arg(name, typ, &builder_name, *is_explicit);
 
@@ -253,7 +251,6 @@ fn implement_builder(
         arg_override_setters.push(override_setters);
         arg_prepare_dependency.push(prepare_dependency);
         arg_provide_dependency.push(provide_dependency);
-        arg_check_dependency.push(check_dependency);
 
         if !dependency_info.is_empty() {
             arg_dependency_info.push(dependency_info);
@@ -367,22 +364,6 @@ fn implement_builder(
             fn get_any(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<::std::sync::Arc<dyn ::std::any::Any + Send + Sync>, ::dill::InjectionError> {
                 Ok(::dill::TypedBuilder::get_with_context(self, cat, ctx)?)
             }
-
-            fn check(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<(), ::dill::ValidationError> {
-                use ::dill::DependencySpec;
-
-                let mut errors = Vec::new();
-                #(
-                if let Err(err) = #arg_check_dependency {
-                    errors.push(err);
-                }
-                )*
-                if errors.len() != 0 {
-                    Err(::dill::ValidationError { errors })
-                } else {
-                    Ok(())
-                }
-            }
         }
 
         impl ::dill::TypedBuilder<#impl_type> for #builder_name {
@@ -430,9 +411,6 @@ fn implement_builder(
                         fn get_any(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<std::sync::Arc<dyn std::any::Any + Send + Sync>, ::dill::InjectionError> {
                             self.0.get_any(cat, ctx)
                         }
-                        fn check(&self, cat: &::dill::Catalog, ctx: &::dill::InjectionContext) -> Result<(), ::dill::ValidationError> {
-                            self.0.check(cat, ctx)
-                        }
                     }
 
                     impl ::dill::TypedBuilder<#interfaces> for _B {
@@ -475,7 +453,6 @@ fn implement_arg(
     proc_macro2::TokenStream, // override_setters
     proc_macro2::TokenStream, // prepare_dependency
     proc_macro2::TokenStream, // provide_dependency
-    proc_macro2::TokenStream, // check_dependency
     proc_macro2::TokenStream, // dependency_info
 ) {
     let override_fn_name = format_ident!("arg_{}_fn", name);
@@ -543,24 +520,6 @@ fn implement_arg(
         }
     };
 
-    // Used in TBuilder::check() to validate the dependency
-    let check_dependency = if is_explicit {
-        quote! { Ok(()) }
-    } else {
-        let do_check_dependency = get_do_check_dependency(&injection_type);
-        match &injection_type {
-            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
-                quote! { #do_check_dependency }
-            }
-            _ => quote! {
-                match &self.#override_fn_name {
-                    Some(_) => Ok(()),
-                    _ => #do_check_dependency,
-                }
-            },
-        }
-    };
-
     // Used in TBuilder::build() to extract the dependency from the catalog
     let prepare_dependency = if is_explicit {
         proc_macro2::TokenStream::new()
@@ -595,7 +554,11 @@ fn implement_arg(
     let dependency_info = if is_explicit {
         proc_macro2::TokenStream::new()
     } else {
-        get_do_get_dependency_info(&injection_type)
+        let info = get_do_get_dependency_info(&injection_type);
+        match &injection_type {
+            InjectionType::Reference { .. } | InjectionType::CatalogRef => info,
+            _ => quote! { #info.bound(self.#override_fn_name.is_some()) },
+        }
     };
 
     (
@@ -604,43 +567,11 @@ fn implement_arg(
         override_setters,
         prepare_dependency,
         provide_dependency,
-        check_dependency,
         dependency_info,
     )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn get_do_check_dependency(injection_type: &InjectionType) -> proc_macro2::TokenStream {
-    match injection_type {
-        InjectionType::Catalog => quote! { Ok(()) },
-        InjectionType::CatalogRef => quote! { Ok(()) },
-        InjectionType::Arc { inner } => quote! { ::dill::OneOf::<#inner>::check(cat, ctx) },
-        InjectionType::Reference { inner } => quote! { ::dill::OneOf::<#inner>::check(cat, ctx) },
-        InjectionType::Option { element } => match element.as_ref() {
-            InjectionType::Arc { inner } => {
-                quote! { ::dill::Maybe::<::dill::OneOf::<#inner>>::check(cat, ctx) }
-            }
-            InjectionType::Value { typ } => {
-                quote! { ::dill::Maybe::<::dill::OneOf::<#typ>>::check(cat, ctx) }
-            }
-            _ => {
-                unimplemented!("Currently only Option<Arc<Iface>> and Option<Value> are supported")
-            }
-        },
-        InjectionType::Lazy { element } => match element.as_ref() {
-            InjectionType::Arc { inner } => {
-                quote! { ::dill::specs::Lazy::<::dill::OneOf::<#inner>>::check(cat, ctx) }
-            }
-            _ => unimplemented!("Currently only Lazy<Arc<Iface>> is supported"),
-        },
-        InjectionType::Vec { item } => match item.as_ref() {
-            InjectionType::Arc { inner } => quote! { ::dill::AllOf::<#inner>::check(cat, ctx) },
-            _ => unimplemented!("Currently only Vec<Arc<Iface>> is supported"),
-        },
-        InjectionType::Value { typ } => quote! { ::dill::OneOf::<#typ>::check(cat, ctx) },
-    }
-}
 
 fn get_do_get_dependency(injection_type: &InjectionType) -> proc_macro2::TokenStream {
     match injection_type {

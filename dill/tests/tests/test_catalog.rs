@@ -70,7 +70,7 @@ fn test_bind_with_no_impl_panics() {
 }
 
 #[test]
-fn test_self_injection() {
+fn test_self_injection_ref() {
     trait A: Send + Sync {
         fn test(&self) -> String;
     }
@@ -136,6 +136,22 @@ fn test_self_injection() {
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::bimpl::c");
+}
+
+#[test]
+fn test_self_injection_val() {
+    #[component]
+    struct A {
+        catalog: Catalog,
+    }
+
+    let cat = CatalogBuilder::new().add::<A>().build();
+
+    let inst = cat.get_one::<A>().unwrap();
+    assert_eq!(
+        inst.catalog.builders().collect::<Vec<_>>().len(),
+        cat.builders().collect::<Vec<_>>().len()
+    );
 }
 
 #[test]

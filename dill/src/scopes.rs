@@ -23,8 +23,11 @@ pub trait Scope {
 // Transient
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Never caches so that every dependency resolution will result in a new
-/// instance.
+/// The default scope. Never caches instances, so that every dependency
+/// resolution will result in a new instance. This scope is intended for
+/// short-lived objects and will result in validation error if you attempt to
+/// inject it into objects with long-lived scopes like [`Singleton`]. Instances
+/// that can be safely held on to can use the [`Agnostic`] scope.
 pub struct Transient;
 
 impl Default for Transient {
@@ -40,6 +43,40 @@ impl Transient {
 }
 
 impl Scope for Transient {
+    fn get_or_create<Clb>(
+        &self,
+        _cat: &crate::Catalog,
+        create_instance: Clb,
+    ) -> Result<Arc<dyn Any + Send + Sync>, InjectionError>
+    where
+        Clb: FnOnce() -> Result<Arc<dyn Any + Send + Sync>, InjectionError>,
+    {
+        create_instance()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Agnostic
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Behaves the same as [`Transient`] scope, but is used to explicitly signal
+/// that it's OK to inject the instances of this type into scopes that may hold
+/// on to them for a long time.
+pub struct Agnostic;
+
+impl Default for Agnostic {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Agnostic {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl Scope for Agnostic {
     fn get_or_create<Clb>(
         &self,
         _cat: &crate::Catalog,

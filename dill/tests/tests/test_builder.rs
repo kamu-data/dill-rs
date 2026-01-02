@@ -51,7 +51,7 @@ fn test_default_interfaces() {
     let b = cat.builders().next().unwrap();
     assert_eq!(b.interfaces_get_all().len(), 1);
     assert_eq!(
-        b.interfaces_get_all()[0].type_name,
+        b.interfaces_get_all()[0].name,
         "dyn unit::tests::test_builder::test_default_interfaces::A"
     );
 

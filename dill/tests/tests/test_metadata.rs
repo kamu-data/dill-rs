@@ -62,7 +62,7 @@ fn test_metadata() {
     for b in cat.builders_for::<dyn EventHandler>() {
         b.metadata(&mut |meta| {
             if let Some(meta) = meta.downcast_ref::<EventHandlerDesc>() {
-                metas.push((b.instance_type().type_name, meta.event_type));
+                metas.push((b.instance_type().name, meta.event_type));
             }
             true
         });
@@ -96,7 +96,7 @@ fn test_metadata() {
         .builders_for_with_meta::<dyn EventHandler, _>(|desc: &EventHandlerDesc| {
             desc.event_type == "B"
         })
-        .map(|b| b.instance_type().type_name)
+        .map(|b| b.instance_type().name)
         .collect::<Vec<_>>();
 
     res.sort();
@@ -126,13 +126,6 @@ fn test_metadata() {
             .map(|b| b.get_with_context(cat, ctx))
             .collect()
         }
-
-        fn check(
-            _cat: &dill::Catalog,
-            _ctx: &dill::InjectionContext,
-        ) -> Result<(), dill::InjectionError> {
-            unimplemented!()
-        }
     }
 
     let mut res = cat
@@ -150,7 +143,7 @@ fn test_metadata() {
         .builders_for_with_meta::<dyn EventHandler, _>(|desc: &EventHandlerDesc| {
             desc.event_type == "B"
         })
-        .map(|b| b.instance_type().type_name)
+        .map(|b| b.instance_type().name)
         .collect::<Vec<_>>();
 
     res.sort();

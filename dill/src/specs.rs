@@ -15,9 +15,6 @@ pub trait DependencySpec {
 
     /// Resolve and create instances
     fn get(cat: &Catalog, ctx: &InjectionContext) -> Result<Self::ReturnType, InjectionError>;
-
-    /// Only resolve builders without instantiating and report errors
-    fn check(cat: &Catalog, ctx: &InjectionContext) -> Result<(), InjectionError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -53,19 +50,6 @@ where
             Err(InjectionError::unregistered::<Iface>(ctx))
         }
     }
-
-    fn check(cat: &Catalog, ctx: &InjectionContext) -> Result<(), InjectionError> {
-        let mut builders = cat.builders_for::<Iface>();
-        if builders.next().is_some() {
-            if builders.next().is_some() {
-                Err(InjectionError::ambiguous::<Iface>(ctx))
-            } else {
-                Ok(())
-            }
-        } else {
-            Err(InjectionError::unregistered::<Iface>(ctx))
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,11 +77,6 @@ where
             .map(|b| b.get_with_context(cat, ctx))
             .collect()
     }
-
-    fn check(_cat: &Catalog, _ctx: &InjectionContext) -> Result<(), InjectionError> {
-        // TODOOOOOOOOOOOOO?????????????????
-        Ok(())
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,14 +96,6 @@ impl<Inner: DependencySpec + 'static> DependencySpec for Maybe<Inner> {
         match Inner::get(cat, ctx) {
             Ok(v) => Ok(Some(v)),
             Err(InjectionError::Unregistered(_)) => Ok(None),
-            Err(err) => Err(err),
-        }
-    }
-
-    fn check(cat: &Catalog, ctx: &InjectionContext) -> Result<(), InjectionError> {
-        match Inner::check(cat, ctx) {
-            Ok(()) => Ok(()),
-            Err(InjectionError::Unregistered(_)) => Ok(()),
             Err(err) => Err(err),
         }
     }
@@ -163,9 +134,5 @@ impl<Inner: DependencySpec + 'static> DependencySpec for Lazy<Inner> {
                 Err(_) => fallback_cat.get::<Inner>(),
             },
         ))
-    }
-
-    fn check(cat: &Catalog, ctx: &InjectionContext) -> Result<(), InjectionError> {
-        Inner::check(cat, ctx)
     }
 }
