@@ -37,7 +37,7 @@ fn test_macro_without_use() {
 }
 
 #[test]
-fn test_macro_explicit_args() {
+fn test_macro_explicit_args_field() {
     use dill::*;
 
     trait A: Send + Sync {
@@ -73,6 +73,55 @@ fn test_macro_explicit_args() {
     let cat = Catalog::builder()
         .add::<BImpl>()
         .add_builder(AImpl::builder("foo".to_string()))
+        .build();
+
+    let a = cat.get_one::<AImpl>().unwrap();
+    assert_eq!(a.test(), "aimpl::bimpl::foo");
+}
+
+#[test]
+fn test_macro_explicit_args_ctor() {
+    use dill::*;
+
+    trait A: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    trait B: Send + Sync {
+        fn test(&self) -> String;
+    }
+
+    struct AImpl {
+        b: Arc<dyn B>,
+        suffix: Arc<dyn Fn() -> String + Send + Sync>,
+    }
+    #[component]
+    impl AImpl {
+        pub fn new(
+            b: Arc<dyn B>,
+            #[component(explicit)] suffix: Arc<dyn Fn() -> String + Send + Sync>,
+        ) -> Self {
+            Self { b, suffix }
+        }
+    }
+    impl A for AImpl {
+        fn test(&self) -> String {
+            format!("aimpl::{}::{}", self.b.test(), (self.suffix)())
+        }
+    }
+
+    #[component]
+    #[interface(dyn B)]
+    struct BImpl;
+    impl B for BImpl {
+        fn test(&self) -> String {
+            "bimpl".to_owned()
+        }
+    }
+
+    let cat = Catalog::builder()
+        .add::<BImpl>()
+        .add_builder(AImpl::builder(Arc::new(|| "foo".to_string())))
         .build();
 
     let a = cat.get_one::<AImpl>().unwrap();

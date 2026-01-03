@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use dill::*;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_add_value() {
     let mut cat = CatalogBuilder::new();
@@ -14,6 +16,8 @@ fn test_add_value() {
     let val2 = cat.get_one::<String>().unwrap();
     assert_eq!(val.as_ptr(), val2.as_ptr());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_add_value_lazy() {
@@ -28,6 +32,8 @@ fn test_add_value_lazy() {
     assert_eq!(val.as_ptr(), val2.as_ptr());
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_add_builder_arc() {
     let mut cat = CatalogBuilder::new();
@@ -37,6 +43,8 @@ fn test_add_builder_arc() {
     let val = cat.get_one::<String>().unwrap();
     assert_eq!(val.as_ref(), "foo");
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_add_builder_fn() {
@@ -48,6 +56,8 @@ fn test_add_builder_fn() {
     assert_eq!(val.as_ref(), "foo");
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 #[should_panic]
 fn test_add_impl_twice_panics() {
@@ -55,6 +65,8 @@ fn test_add_impl_twice_panics() {
     cat.add_value("foo".to_owned());
     cat.add_value("foo".to_owned());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 #[should_panic]
@@ -69,28 +81,23 @@ fn test_bind_with_no_impl_panics() {
     CatalogBuilder::new().bind::<dyn A, AImpl>();
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
-fn test_self_injection_ref() {
+fn test_self_injection_weak_ref() {
     trait A: Send + Sync {
         fn test(&self) -> String;
     }
 
-    struct AImpl1 {
-        b: Arc<dyn B>,
-    }
-
     #[component]
-    impl AImpl1 {
-        fn new(catalog: &Catalog) -> Self {
-            Self {
-                b: catalog.get_one().unwrap(),
-            }
-        }
+    struct AImpl1 {
+        catalog: CatalogWeakRef,
     }
 
     impl A for AImpl1 {
         fn test(&self) -> String {
-            format!("aimpl::{}", self.b.test())
+            let b = self.catalog.get_one::<dyn B>().unwrap();
+            format!("aimpl::{}", b.test())
         }
     }
 
@@ -104,7 +111,7 @@ fn test_self_injection_ref() {
 
     #[component]
     impl BImpl {
-        fn new(catalog: Catalog) -> Self {
+        fn new(catalog: CatalogWeakRef) -> Self {
             Self {
                 c: catalog.get_one().unwrap(),
             }
@@ -138,21 +145,167 @@ fn test_self_injection_ref() {
     assert_eq!(inst.test(), "aimpl::bimpl::c");
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
-fn test_self_injection_val() {
+fn test_self_injection_by_val() {
     #[component]
     struct A {
+        #[allow(unused)]
         catalog: Catalog,
     }
 
     let cat = CatalogBuilder::new().add::<A>().build();
-
-    let inst = cat.get_one::<A>().unwrap();
-    assert_eq!(
-        inst.catalog.builders().collect::<Vec<_>>().len(),
-        cat.builders().collect::<Vec<_>>().len()
-    );
+    cat.get_one::<A>().unwrap();
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_self_injection_singleton_cleanup() {
+    static INSTANCE_COUNT: std::sync::Mutex<i32> = std::sync::Mutex::new(0);
+
+    struct A {
+        #[allow(dead_code)]
+        catalog: dill::CatalogWeakRef,
+    }
+
+    #[dill::component]
+    #[dill::scope(dill::scopes::Singleton)]
+    impl A {
+        pub fn new(catalog: CatalogWeakRef) -> Self {
+            (*INSTANCE_COUNT.lock().unwrap()) += 1;
+            Self { catalog }
+        }
+    }
+
+    impl Drop for A {
+        fn drop(&mut self) {
+            (*INSTANCE_COUNT.lock().unwrap()) -= 1;
+        }
+    }
+
+    {
+        let cat = CatalogBuilder::new().add::<A>().build();
+
+        {
+            let _inst = cat.get_one::<A>().unwrap();
+
+            {
+                // We have the instance
+                let instance_count = *INSTANCE_COUNT.lock().unwrap();
+                assert_eq!(instance_count, 1);
+            }
+        }
+
+        {
+            // Singleton still caches the instance
+            let instance_count = *INSTANCE_COUNT.lock().unwrap();
+            assert_eq!(instance_count, 1);
+        }
+    }
+
+    {
+        // Catalog drops and releases the instance cached in a Singleton scope
+        let instance_count = *INSTANCE_COUNT.lock().unwrap();
+        assert_eq!(instance_count, 0);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_self_injection_into_singleton_via_chained_catalog() {
+    static INSTANCE_COUNT: std::sync::Mutex<i32> = std::sync::Mutex::new(0);
+
+    #[dill::component]
+    struct A {
+        b: Arc<B>,
+    }
+
+    impl A {
+        fn run(&self) -> String {
+            self.b.run()
+        }
+    }
+
+    struct B {
+        catalog: dill::CatalogWeakRef,
+    }
+
+    #[dill::component]
+    #[dill::scope(dill::scopes::Singleton)]
+    impl B {
+        pub fn new(catalog: CatalogWeakRef) -> Self {
+            (*INSTANCE_COUNT.lock().unwrap()) += 1;
+            Self { catalog }
+        }
+
+        fn run(&self) -> String {
+            let c = self.catalog.get_one::<C>().unwrap();
+            c.run()
+        }
+    }
+
+    impl Drop for B {
+        fn drop(&mut self) {
+            (*INSTANCE_COUNT.lock().unwrap()) -= 1;
+        }
+    }
+
+    #[dill::component]
+    struct C {}
+
+    impl C {
+        fn run(&self) -> String {
+            "hello".to_string()
+        }
+    }
+
+    {
+        let base_cat = CatalogBuilder::new().add::<B>().add::<C>().build();
+
+        {
+            let chained_cat = base_cat.builder_chained().add::<A>().build();
+
+            let a = chained_cat.get_one::<A>().unwrap();
+            assert_eq!(a.run(), "hello");
+
+            {
+                // We have the instance
+                let instance_count = *INSTANCE_COUNT.lock().unwrap();
+                assert_eq!(instance_count, 1);
+            }
+        }
+
+        {
+            // Singleton still caches the instance
+            let instance_count = *INSTANCE_COUNT.lock().unwrap();
+            assert_eq!(instance_count, 1);
+        }
+
+        {
+            let chained_cat = base_cat.builder_chained().add::<A>().build();
+
+            let a = chained_cat.get_one::<A>().unwrap();
+            assert_eq!(a.run(), "hello");
+
+            {
+                // We reuse the instance
+                let instance_count = *INSTANCE_COUNT.lock().unwrap();
+                assert_eq!(instance_count, 1);
+            }
+        }
+    }
+
+    {
+        // Catalog drops and releases the instance cached in a Singleton scope
+        let instance_count = *INSTANCE_COUNT.lock().unwrap();
+        assert_eq!(instance_count, 0);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_chained_catalog_binds() {
@@ -216,6 +369,8 @@ fn test_chained_catalog_binds() {
     assert_eq!(inst_later_a.test(), "aimpl::bimpl::foo");
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[cfg(feature = "tokio")]
 #[tokio::test]
 async fn test_catalog_scope() {
@@ -257,6 +412,8 @@ async fn test_catalog_scope() {
     assert_eq!(proof.as_str(), "2");
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_catalog_binds_interfaces_for_builder_with_impl_without_explicit_args() {
     trait A: Send + Sync {
@@ -283,6 +440,8 @@ fn test_catalog_binds_interfaces_for_builder_with_impl_without_explicit_args() {
     let a = catalog.get_one::<dyn A>().unwrap();
     assert_eq!(a.test(), "aimpl");
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_catalog_skips_interfaces_binding_for_builder_with_impl_without_explicit_args() {
@@ -313,6 +472,8 @@ fn test_catalog_skips_interfaces_binding_for_builder_with_impl_without_explicit_
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test]
 fn test_catalog_binds_interfaces_for_builder_with_explicit_args() {
     trait A: Send + Sync {
@@ -342,6 +503,8 @@ fn test_catalog_binds_interfaces_for_builder_with_explicit_args() {
     let a = catalog.get_one::<dyn A>().unwrap();
     assert_eq!(a.test(), "aimpl::foo");
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_catalog_skips_interfaces_binding_for_builder_with_explicit_args() {
@@ -374,6 +537,8 @@ fn test_catalog_skips_interfaces_binding_for_builder_with_explicit_args() {
         _ => panic!("Expected an unregistered error"),
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn test_catalog_binds_interfaces_for_builder_does_not_require_an_explicit_bind() {

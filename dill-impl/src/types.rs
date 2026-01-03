@@ -5,6 +5,7 @@ use quote::ToTokens;
 pub(crate) enum InjectionType {
     Catalog,
     CatalogRef,
+    CatalogWeakRef,
     Arc { inner: syn::Type },
     Reference { inner: syn::Type },
     Option { element: Box<InjectionType> },
@@ -16,12 +17,12 @@ pub(crate) enum InjectionType {
 pub(crate) fn deduce_injection_type(typ: &syn::Type) -> InjectionType {
     if is_catalog(typ) {
         InjectionType::Catalog
+    } else if is_catalog_ref(typ) {
+        InjectionType::CatalogRef
+    } else if is_catalog_weak_ref(typ) {
+        InjectionType::CatalogWeakRef
     } else if let Some(inner) = strip_reference(typ) {
-        if is_catalog(&inner) {
-            InjectionType::CatalogRef
-        } else {
-            InjectionType::Reference { inner }
-        }
+        InjectionType::Reference { inner }
     } else if let Some(inner) = get_arc_element_type(typ) {
         InjectionType::Arc { inner }
     } else if let Some(elem_typ) = get_option_element_type(typ) {
@@ -49,6 +50,27 @@ pub(crate) fn is_catalog(typ: &syn::Type) -> bool {
     };
 
     typepath.qself.is_none() && typepath.path.segments.last().unwrap().ident == "Catalog"
+}
+
+pub(crate) fn is_catalog_ref(typ: &syn::Type) -> bool {
+    match typ {
+        syn::Type::Reference(r) => match r.elem.as_ref() {
+            syn::Type::Path(type_path) => {
+                type_path.qself.is_none()
+                    && type_path.path.segments.last().unwrap().ident == "Catalog"
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+pub(crate) fn is_catalog_weak_ref(typ: &syn::Type) -> bool {
+    let syn::Type::Path(typepath) = typ else {
+        return false;
+    };
+
+    typepath.qself.is_none() && typepath.path.segments.last().unwrap().ident == "CatalogWeakRef"
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

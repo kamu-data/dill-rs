@@ -244,18 +244,22 @@ fn implement_builder(
             prepare_dependency,
             provide_dependency,
             dependency_info,
-        ) = implement_arg(name, typ, &builder_name, *is_explicit);
+        ) = implement_arg(name, typ, &builder_name, &scope_type, *is_explicit);
 
         arg_override_fn_field.push(override_fn_field);
         arg_override_fn_field_ctor.push(override_fn_field_ctor);
         arg_override_setters.push(override_setters);
         arg_prepare_dependency.push(prepare_dependency);
         arg_provide_dependency.push(provide_dependency);
-
-        if !dependency_info.is_empty() {
-            arg_dependency_info.push(dependency_info);
-        }
+        arg_dependency_info.push(dependency_info);
     }
+
+    arg_override_fn_field.retain(|t| !t.is_empty());
+    arg_override_fn_field_ctor.retain(|t| !t.is_empty());
+    arg_override_setters.retain(|t| !t.is_empty());
+    arg_prepare_dependency.retain(|t| !t.is_empty());
+    arg_provide_dependency.retain(|t| !t.is_empty());
+    arg_dependency_info.retain(|t| !t.is_empty());
 
     let explicit_arg_decl: Vec<_> = args
         .iter()
@@ -446,6 +450,7 @@ fn implement_arg(
     name: &syn::Ident,
     typ: &syn::Type,
     builder: &syn::Ident,
+    scope_type: &syn::Path,
     is_explicit: bool,
 ) -> (
     proc_macro2::TokenStream, // override_fn_field
@@ -469,9 +474,10 @@ fn implement_arg(
         quote! { #name: #typ }
     } else {
         match &injection_type {
-            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
-                proc_macro2::TokenStream::new()
-            }
+            InjectionType::Reference { .. }
+            | InjectionType::Catalog
+            | InjectionType::CatalogRef
+            | InjectionType::CatalogWeakRef => proc_macro2::TokenStream::new(),
             _ => quote! {
                 #override_fn_name: Option<Box<dyn Fn(&::dill::Catalog) -> Result<#typ, ::dill::InjectionError> + Send + Sync>>
             },
@@ -484,9 +490,10 @@ fn implement_arg(
         quote! { #name: #name }
     } else {
         match &injection_type {
-            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
-                proc_macro2::TokenStream::new()
-            }
+            InjectionType::Reference { .. }
+            | InjectionType::Catalog
+            | InjectionType::CatalogRef
+            | InjectionType::CatalogWeakRef => proc_macro2::TokenStream::new(),
             _ => quote! { #override_fn_name: None },
         }
     };
@@ -496,9 +503,10 @@ fn implement_arg(
         proc_macro2::TokenStream::new()
     } else {
         match &injection_type {
-            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
-                proc_macro2::TokenStream::new()
-            }
+            InjectionType::Reference { .. }
+            | InjectionType::Catalog
+            | InjectionType::CatalogRef
+            | InjectionType::CatalogWeakRef => proc_macro2::TokenStream::new(),
             _ => {
                 let setter_val_name = format_ident!("with_{}", name);
                 let setter_fn_name = format_ident!("with_{}_fn", name);
@@ -524,9 +532,12 @@ fn implement_arg(
     let prepare_dependency = if is_explicit {
         proc_macro2::TokenStream::new()
     } else {
-        let do_get_dependency = get_do_get_dependency(&injection_type);
+        let do_get_dependency = get_do_get_dependency(&injection_type, scope_type);
         match &injection_type {
-            InjectionType::Reference { .. } | InjectionType::CatalogRef => {
+            InjectionType::Reference { .. }
+            | InjectionType::Catalog
+            | InjectionType::CatalogRef
+            | InjectionType::CatalogWeakRef => {
                 quote! { let #name = #do_get_dependency; }
             }
             _ => quote! {
@@ -556,7 +567,10 @@ fn implement_arg(
     } else {
         let info = get_do_get_dependency_info(&injection_type);
         match &injection_type {
-            InjectionType::Reference { .. } | InjectionType::CatalogRef => info,
+            InjectionType::Reference { .. }
+            | InjectionType::Catalog
+            | InjectionType::CatalogRef
+            | InjectionType::CatalogWeakRef => info,
             _ => quote! { #info.bound(self.#override_fn_name.is_some()) },
         }
     };
@@ -573,10 +587,24 @@ fn implement_arg(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn get_do_get_dependency(injection_type: &InjectionType) -> proc_macro2::TokenStream {
+fn get_do_get_dependency(
+    injection_type: &InjectionType,
+    scope_type: &syn::Path,
+) -> proc_macro2::TokenStream {
     match injection_type {
-        InjectionType::Catalog => quote! { cat.clone() },
+        InjectionType::Catalog => {
+            if scope_type.segments.last().unwrap().ident != "Transient" {
+                panic!(
+                    "`Catalog` can only be injected by value into components in a `Transient` \
+                     scope as they guarantee a short lifetime. Injecting catalog into other \
+                     scopes may result in cyclic references and resource leaks."
+                );
+            } else {
+                quote! { cat.clone() }
+            }
+        }
         InjectionType::CatalogRef => quote! { cat },
+        InjectionType::CatalogWeakRef => quote! { cat.weak_ref() },
         InjectionType::Arc { inner } => {
             quote! { cat.get_with_context::<::dill::OneOf::<#inner>>(ctx)? }
         }
@@ -616,6 +644,9 @@ fn get_do_get_dependency_info(injection_type: &InjectionType) -> proc_macro2::To
     match injection_type {
         InjectionType::Catalog | InjectionType::CatalogRef => {
             quote! { ::dill::DependencyInfo::of::<::dill::Catalog, ::dill::specs::OneOf::<::dill::Catalog>>() }
+        }
+        InjectionType::CatalogWeakRef => {
+            quote! { ::dill::DependencyInfo::of::<::dill::CatalogWeakRef, ::dill::specs::OneOf::<::dill::CatalogWeakRef>>() }
         }
         InjectionType::Arc { inner } => quote! {
             ::dill::DependencyInfo::of::<#inner, ::dill::specs::OneOf::<#inner>>()

@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Validation will return errors for scope inversions, e.g. in case when a `Transient` component is injected into `Singleton` scope and therefore will live longer than it may be expected
 - Improved `Scope` interface to avoid excessive locking and lookups
+### Fixed
+- **BREAKING**: It is no longer possible to inject `Catalog` by value into a component with any scope other than `Transient`. Previously you could inject `Catalog` into a `Singleton` component, creating an `Arc` reference loop that would prevent catalog and all its cached instances from ever being dropped. Now such code will not compile. New injectable `CatalogWeakRef` type allows to cache catalog in a `Singleton` component without holding a strong reference. You can also efficiently inject `&Catalog` if you only need to access the catalog for a brief period during instantiation. 
 
 ## [0.14.0] - 2025-05-26
 ### Changed

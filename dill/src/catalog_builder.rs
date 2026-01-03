@@ -15,7 +15,7 @@ use crate::*;
 pub struct CatalogBuilder {
     builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
     bindings: MultiMap<IfaceTypeId, Binding>,
-    chained_catalog: Option<Catalog>,
+    chained_catalog: Option<Arc<CatalogImpl>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ impl CatalogBuilder {
         Self {
             builders: HashMap::new(),
             bindings: MultiMap::new(),
-            chained_catalog: Some(chained_catalog.clone()),
+            chained_catalog: Some(chained_catalog.0.clone()),
         }
     }
 
@@ -149,7 +149,11 @@ impl CatalogBuilder {
         let mut bindings = MultiMap::new();
         std::mem::swap(&mut self.builders, &mut builders);
         std::mem::swap(&mut self.bindings, &mut bindings);
-        Catalog::new(builders, bindings, self.chained_catalog.take())
+        Catalog::new(Arc::new(CatalogImpl::new(
+            builders,
+            bindings,
+            self.chained_catalog.take(),
+        )))
     }
 
     /// Validates the dependency graph returning a combined error.
@@ -184,10 +188,10 @@ impl CatalogBuilder {
 
             let mut chained = self.chained_catalog.as_ref();
             while let Some(c) = chained {
-                if let Some(v) = c.0.bindings.get(t) {
+                if let Some(v) = c.bindings.get(t) {
                     return Some(v);
                 }
-                chained = c.0.chained_catalog.as_ref();
+                chained = c.chained_catalog.as_ref();
             }
             None
         };
@@ -241,7 +245,9 @@ impl CatalogBuilder {
                         }));
                         errors.push(err);
                     }
-                } else if dep.iface.id == TypeId::of::<Catalog>() {
+                } else if dep.iface.id == TypeId::of::<Catalog>()
+                    || dep.iface.id == TypeId::of::<CatalogWeakRef>()
+                {
                     // OK: self-injection of a catalog
                 } else {
                     // TODO: Make spec identification more robust

@@ -1,79 +1,68 @@
-use std::any::TypeId;
-use std::collections::HashMap;
 use std::sync::Arc;
-
-use multimap::MultiMap;
 
 use crate::injection_context::InjectionContext;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub(crate) struct IfaceTypeId(pub TypeId);
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub(crate) struct ImplTypeId(pub TypeId);
+#[derive(Clone)]
+pub struct Catalog(pub(crate) Arc<CatalogImpl>);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
-pub struct Catalog(pub(crate) Arc<CatalogInner>);
-
-#[derive(Clone)]
-pub(crate) struct CatalogInner {
-    pub(crate) builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
-    pub(crate) bindings: MultiMap<IfaceTypeId, Binding>,
-    pub(crate) chained_catalog: Option<Catalog>,
-}
-
 impl Catalog {
+    /// Use [`Catalog::builder()`] to construct.
+    pub(crate) fn new(pimpl: Arc<CatalogImpl>) -> Self {
+        Self(pimpl)
+    }
+
+    /// Returns a [`CatalogBuilder`] used to initialize a [`Catalog`].
     pub fn builder() -> CatalogBuilder {
         CatalogBuilder::new()
     }
 
+    /// Returns a [`CatalogBuilder`] that is chained to this [`Catalog`] and
+    /// thus "inherits" all previous builders and bindings. Chaining catalogs is
+    /// a very useful technique to add dynamic values that are not known
+    /// upfront. For example, catalog chaining can be used in HTTP server
+    /// middleware to add authorization information about the caller after
+    /// validating the security token, or to open a database transaction and
+    /// make it available for injection to all subsequently instantiated
+    /// services.
     pub fn builder_chained(&self) -> CatalogBuilder {
         CatalogBuilder::new_chained(self)
     }
 
-    pub(crate) fn new(
-        builders: HashMap<ImplTypeId, Arc<dyn Builder>>,
-        bindings: MultiMap<IfaceTypeId, Binding>,
-        chained_catalog: Option<Catalog>,
-    ) -> Self {
-        Self(Arc::new(CatalogInner {
-            builders,
-            bindings,
-            chained_catalog,
-        }))
+    /// Returns a weak reference to the catalog chain. Weak reference is useful
+    /// when you want to keep using `Catalog` as a factory for complex
+    /// instantiation logic, but don't want to own the strong reference that
+    /// prevents it to be dropped. It's imperative to use weak references in
+    /// [`Singleton`] and other caching scopes, as otherwise you may end up with
+    /// cyclic references that prevent all instances from ever being cleaned up.
+    pub fn weak_ref(&self) -> CatalogWeakRef {
+        CatalogWeakRef::new(&self.0)
     }
 
+    /// Returns an iterator over all registered instance [`Builder`]s.
+    #[inline(always)]
     pub fn builders<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Builder> + 'a> {
-        let it_builders = self.0.builders.values().map(|b| b.as_ref());
-        if let Some(chained_catalog) = &self.0.chained_catalog {
-            Box::new(it_builders.chain(chained_catalog.builders()))
-        } else {
-            Box::new(it_builders)
-        }
+        self.0.builders()
     }
 
+    /// Returns an iterator over [`Builder`]s bound to a specific interface
+    /// type.
+    #[inline(always)]
     pub fn builders_for<'a, Iface>(
         &'a self,
     ) -> Box<dyn Iterator<Item = TypecastBuilder<'a, Iface>> + 'a>
     where
         Iface: 'static + ?Sized,
     {
-        let iface_type = IfaceTypeId(TypeId::of::<Iface>());
-        let bindings = self.0.bindings.get_vec(&iface_type);
-        let it_bindings = TypecastBuilderIterator::new(bindings);
-
-        if let Some(chained_catalog) = &self.0.chained_catalog {
-            Box::new(it_bindings.chain(chained_catalog.builders_for::<Iface>()))
-        } else {
-            Box::new(it_bindings)
-        }
+        self.0.builders_for()
     }
 
+    /// Filters [`Builder`]s by bound interface type and metadata predicate.
+    #[inline(always)]
     pub fn builders_for_with_meta<'a, Iface, Meta>(
         &'a self,
         pred: impl Fn(&Meta) -> bool + Copy + 'a,
@@ -82,20 +71,12 @@ impl Catalog {
         Iface: 'static + ?Sized,
         Meta: 'static,
     {
-        let iface_type = IfaceTypeId(TypeId::of::<Iface>());
-        let bindings = self.0.bindings.get_vec(&iface_type);
-
-        let it_bindings =
-            TypecastPredicateBuilderIterator::new(bindings, move |b| b.metadata_contains(pred));
-
-        if let Some(chained_catalog) = &self.0.chained_catalog {
-            Box::new(it_bindings.chain(chained_catalog.builders_for_with_meta::<Iface, Meta>(pred)))
-        } else {
-            Box::new(it_bindings)
-        }
+        self.0.builders_for_with_meta(pred)
     }
 
-    #[inline]
+    /// Resolves and attempts to get an instance by a specific dependency
+    /// [`DependencySpec`].
+    #[inline(always)]
     pub fn get<Spec>(&self) -> Result<Spec::ReturnType, InjectionError>
     where
         Spec: DependencySpec + 'static,
@@ -103,7 +84,7 @@ impl Catalog {
         self.get_with_context::<Spec>(&InjectionContext::new_root())
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn get_with_context<Spec>(
         &self,
         ctx: &InjectionContext,
@@ -115,7 +96,7 @@ impl Catalog {
     }
 
     /// A short-hand for `get::<OneOf<T>>()`.
-    #[inline]
+    #[inline(always)]
     pub fn get_one<Iface>(&self) -> Result<Arc<Iface>, InjectionError>
     where
         Iface: 'static + ?Sized + Send + Sync,
@@ -186,6 +167,20 @@ impl Catalog {
         CURRENT_CATALOG.get()
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::fmt::Debug for Catalog {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Catalog(0x{:x})",
+            self.0.as_ref() as *const CatalogImpl as usize
+        )
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "tokio")]
 tokio::task_local! {

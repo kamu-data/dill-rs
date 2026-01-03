@@ -105,24 +105,20 @@ fn test_validate_bound_fields() {
 
 #[test]
 fn test_validate_catalog_inject() {
-    trait A: Send + Sync {}
-
     #[allow(dead_code)]
-    struct AImpl {
-        catalog: Catalog,
+    struct A {
+        catalog: CatalogWeakRef,
     }
 
     #[component]
-    impl AImpl {
-        pub fn new(catalog: Catalog) -> Self {
+    impl A {
+        pub fn new(catalog: CatalogWeakRef, _catalog_ref: &Catalog) -> Self {
             Self { catalog }
         }
     }
-    impl A for AImpl {}
 
     let mut b = CatalogBuilder::new();
-    b.add::<AImpl>();
-    b.bind::<dyn A, AImpl>();
+    b.add::<A>();
 
     b.validate().unwrap();
 }
