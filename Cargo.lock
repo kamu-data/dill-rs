@@ -253,7 +253,7 @@ dependencies = [
 
 [[package]]
 name = "dill"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "dill-impl",
  "indoc",
@@ -265,7 +265,7 @@ dependencies = [
 
 [[package]]
 name = "dill-impl"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -284,7 +284,7 @@ dependencies = [
 
 [[package]]
 name = "example-axum"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "axum",
  "axum-extra",
@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "example-cli"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-trait",
  "clap",
