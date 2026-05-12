@@ -374,7 +374,7 @@ fn test_chained_catalog_binds() {
 #[cfg(feature = "tokio")]
 #[tokio::test]
 async fn test_catalog_scope() {
-    use std::assert_matches::assert_matches;
+    use std::assert_matches;
 
     let cat1 = Catalog::builder().add_value(1i32).build();
 

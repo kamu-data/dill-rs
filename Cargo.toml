@@ -1,5 +1,5 @@
 [workspace]
-resolver = "2"
+resolver = "3"
 members = ["dill-impl", "dill", "examples/axum", "examples/cli"]
 default-members = ["dill-impl", "dill"]
 
