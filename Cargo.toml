@@ -5,11 +5,11 @@ default-members = ["dill-impl", "dill"]
 
 
 [workspace.package]
-version = "0.15.0"
+version = "0.16.0"
 edition = "2024"
 readme = "README.md"
-homepage = "https://github.com/sergiimk/dill-rs"
-repository = "https://github.com/sergiimk/dill-rs"
+homepage = "https://github.com/kamu-data/dill-rs"
+repository = "https://github.com/kamu-data/dill-rs"
 documentation = "https://docs.rs/dill"
 categories = ["config", "development-tools"]
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
@@ -54,4 +54,4 @@ multiple_crate_versions = { level = "allow", priority = 1 }
 
 
 [workspace.dependencies]
-dill-impl = { path = "dill-impl", version = "0.15.0" }
+dill-impl = { path = "dill-impl", version = "0.16.0" }
