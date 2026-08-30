@@ -1,0 +1,4 @@
+[env]
+# NOTE: Dill currently requires nightly features to compile
+# This makes rustc act as nightly compiler for specified crates only
+RUSTC_BOOTSTRAP = "dill"

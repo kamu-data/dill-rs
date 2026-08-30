@@ -1,0 +1,5 @@
+[toolchain]
+# NOTE: Dill currently requires nightly features to compile
+# We use stable rustc for stability, but set RUSTC_BOOTSTRAP
+# for it to act as nightly compiler (see .cargo/config.toml)
+channel = "stable"

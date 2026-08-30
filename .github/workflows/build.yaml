@@ -8,14 +8,22 @@ on:
 env:
   RUST_BACKTRACE: "1"
 jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt, clippy
+      - run: cargo build --workspace --all-features
+      - run: cargo fmt --check
+      - run: cargo clippy
   test_linux:
     name: Test / Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
-        with:
-          components: rustfmt
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
       - run: cargo build --workspace --all-features
-      - run: cargo fmt --check
       - run: cargo test --verbose --workspace --all-features
