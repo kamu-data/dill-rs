@@ -117,7 +117,6 @@ While documentation is still lacking, this crate is production-ready and is [in 
 
 
 # TODO
-- Support `stable` rust
 - Make `Scope`s external to `Builder`s so they could be overridden
 - Consider using traits to map `Arc`, `Option`, `Vec` to dependency specs instead of relying on macro magic
 - Add `trybuild` tests (see https://youtu.be/geovSK3wMB8?t=956)

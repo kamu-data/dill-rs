@@ -390,6 +390,14 @@ fn implement_builder(
         }
 
         #(
+            impl ::dill::CastTo<#interfaces> for #impl_type {
+                fn cast(self: ::std::sync::Arc<Self>) -> ::std::sync::Arc<#interfaces> {
+                    self
+                }
+            }
+        )*
+
+        #(
             // Allows casting TypedBuilder<T> into TypedBuilder<dyn I> for all declared interfaces
             impl ::dill::TypedBuilderCast<#interfaces> for #builder_name
             {

@@ -1,5 +1,3 @@
-#![feature(unsize)]
-
 //! Runtime dependency injection.
 //!
 //! Documentation is under construction!
@@ -61,6 +59,7 @@
 //! }
 //!
 //! #[component]
+//! #[interface(dyn A)]
 //! struct AImpl1;
 //! impl A for AImpl1 {
 //!     fn foo(&self) -> String {
@@ -69,6 +68,7 @@
 //! }
 //!
 //! #[component]
+//! #[interface(dyn A)]
 //! struct AImpl2;
 //! impl A for AImpl2 {
 //!     fn foo(&self) -> String {
@@ -78,9 +78,7 @@
 //!
 //! let catalog = Catalog::builder()
 //!   .add::<AImpl1>()
-//!   .bind::<dyn A, AImpl1>()
 //!   .add::<AImpl2>()
-//!   .bind::<dyn A, AImpl2>()
 //!   .build();
 //!
 //! // AllOf<T> is a DependencySpec that returns instances of all types that implement trait T

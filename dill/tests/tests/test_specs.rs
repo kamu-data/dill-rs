@@ -46,6 +46,7 @@ fn test_one_of_by_interface() {
     }
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl;
 
     impl A for AImpl {
@@ -54,10 +55,7 @@ fn test_one_of_by_interface() {
         }
     }
 
-    let cat = CatalogBuilder::new()
-        .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
-        .build();
+    let cat = CatalogBuilder::new().add::<AImpl>().build();
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl");
@@ -74,6 +72,8 @@ fn test_one_of_by_multiple_interfaces() {
     }
 
     #[component]
+    #[interface(dyn A)]
+    #[interface(dyn B)]
     struct ABImpl;
 
     impl A for ABImpl {
@@ -88,11 +88,7 @@ fn test_one_of_by_multiple_interfaces() {
         }
     }
 
-    let cat = CatalogBuilder::new()
-        .add::<ABImpl>()
-        .bind::<dyn A, ABImpl>()
-        .bind::<dyn B, ABImpl>()
-        .build();
+    let cat = CatalogBuilder::new().add::<ABImpl>().build();
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.foo(), "abimpl");
@@ -107,6 +103,7 @@ fn test_one_of_with_dependency() {
     }
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl {
         b: Arc<dyn B>,
     }
@@ -122,6 +119,7 @@ fn test_one_of_with_dependency() {
     }
 
     #[component]
+    #[interface(dyn B)]
     struct BImpl;
 
     impl B for BImpl {
@@ -130,12 +128,7 @@ fn test_one_of_with_dependency() {
         }
     }
 
-    let cat = CatalogBuilder::new()
-        .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
-        .add::<BImpl>()
-        .bind::<dyn B, BImpl>()
-        .build();
+    let cat = CatalogBuilder::new().add::<AImpl>().add::<BImpl>().build();
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::bimpl");
@@ -150,6 +143,7 @@ fn test_one_of_with_dependency_missing() {
 
     #[allow(dead_code)]
     #[component]
+    #[interface(dyn A)]
     struct AImpl {
         b: Arc<dyn B>,
     }
@@ -165,10 +159,7 @@ fn test_one_of_with_dependency_missing() {
         fn test(&self) -> String;
     }
 
-    let cat = CatalogBuilder::new()
-        .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
-        .build();
+    let cat = CatalogBuilder::new().add::<AImpl>().build();
 
     let res = cat.get::<OneOf<dyn A>>();
     let err = res.err().unwrap();
@@ -188,11 +179,12 @@ fn test_one_of_with_dependency_missing() {
 
 #[test]
 fn test_all_of() {
-    trait A {
+    trait A: Send + Sync {
         fn test(&self) -> String;
     }
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl1;
 
     impl A for AImpl1 {
@@ -202,6 +194,7 @@ fn test_all_of() {
     }
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl2;
 
     impl A for AImpl2 {
@@ -213,8 +206,6 @@ fn test_all_of() {
     let cat = CatalogBuilder::new()
         .add::<AImpl1>()
         .add::<AImpl2>()
-        .bind::<dyn A, AImpl1>()
-        .bind::<dyn A, AImpl2>()
         .build();
 
     let instances = cat.get::<AllOf<dyn A>>().unwrap();
@@ -229,10 +220,12 @@ fn test_all_of_derive() {
     trait A: Send + Sync {}
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl1;
     impl A for AImpl1 {}
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl2;
     impl A for AImpl2 {}
 
@@ -248,9 +241,7 @@ fn test_all_of_derive() {
     let cat = CatalogBuilder::new()
         .add::<BImpl>()
         .add::<AImpl1>()
-        .bind::<dyn A, AImpl1>()
         .add::<AImpl2>()
-        .bind::<dyn A, AImpl2>()
         .build();
 
     assert_eq!(cat.get_one::<BImpl>().unwrap().vec_of_a.len(), 2);
@@ -262,14 +253,12 @@ fn test_maybe() {
     trait B: std::fmt::Debug + Send + Sync {}
 
     #[component]
+    #[interface(dyn A)]
     #[derive(Debug)]
     struct AImpl;
     impl A for AImpl {}
 
-    let cat = CatalogBuilder::new()
-        .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
-        .build();
+    let cat = CatalogBuilder::new().add::<AImpl>().build();
 
     assert_matches!(cat.get::<Maybe<OneOf<dyn B>>>().unwrap(), None);
     assert_matches!(cat.get::<Maybe<OneOf<dyn A>>>().unwrap(), Some(_));
@@ -281,6 +270,7 @@ fn test_maybe_derive() {
     trait A: std::fmt::Debug + Send + Sync {}
 
     #[component]
+    #[interface(dyn A)]
     #[derive(Debug)]
     struct AImpl;
     impl A for AImpl {}
@@ -301,7 +291,6 @@ fn test_maybe_derive() {
     let cat = CatalogBuilder::new()
         .add::<BImpl>()
         .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
         .add_value(42i32)
         .build();
 

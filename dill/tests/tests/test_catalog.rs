@@ -71,9 +71,10 @@ fn test_add_impl_twice_panics() {
 #[test]
 #[should_panic]
 fn test_bind_with_no_impl_panics() {
-    trait A {}
+    trait A: Send + Sync {}
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl;
 
     impl A for AImpl {}
@@ -90,6 +91,7 @@ fn test_self_injection_weak_ref() {
     }
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl1 {
         catalog: CatalogWeakRef,
     }
@@ -110,6 +112,7 @@ fn test_self_injection_weak_ref() {
     }
 
     #[component]
+    #[interface(dyn B)]
     impl BImpl {
         fn new(catalog: CatalogWeakRef) -> Self {
             Self {
@@ -135,9 +138,7 @@ fn test_self_injection_weak_ref() {
 
     let cat = CatalogBuilder::new()
         .add::<AImpl1>()
-        .bind::<dyn A, AImpl1>()
         .add::<BImpl>()
-        .bind::<dyn B, BImpl>()
         .add::<C>()
         .build();
 
@@ -319,6 +320,7 @@ fn test_chained_catalog_binds() {
     }
 
     #[component]
+    #[interface(dyn A)]
     impl AImpl {
         pub fn new(bee: Arc<dyn B>) -> Self {
             Self {
@@ -339,6 +341,7 @@ fn test_chained_catalog_binds() {
     }
 
     #[component]
+    #[interface(dyn B)]
     struct BImpl;
 
     impl B for BImpl {
@@ -347,14 +350,10 @@ fn test_chained_catalog_binds() {
         }
     }
 
-    let cat_earlier = CatalogBuilder::new()
-        .add::<BImpl>()
-        .bind::<dyn B, BImpl>()
-        .build();
+    let cat_earlier = CatalogBuilder::new().add::<BImpl>().build();
 
     let cat_later = CatalogBuilder::new_chained(&cat_earlier)
         .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
         .build();
 
     let inst_earlier_b = cat_earlier.get_one::<dyn B>().unwrap();

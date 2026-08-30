@@ -7,6 +7,7 @@ fn test_macro_without_use() {
     }
 
     #[dill::component]
+    #[dill::interface(dyn A)]
     struct AImpl {
         // Needed for compiler not to optimize type out
         name: String,
@@ -20,7 +21,6 @@ fn test_macro_without_use() {
 
     let cat = dill::CatalogBuilder::new()
         .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
         .add_value("foo".to_owned())
         .build();
 

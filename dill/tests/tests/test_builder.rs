@@ -10,6 +10,7 @@ fn test_type_info() {
     }
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl;
 
     impl A for AImpl {
@@ -18,10 +19,7 @@ fn test_type_info() {
         }
     }
 
-    let cat = CatalogBuilder::new()
-        .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
-        .build();
+    let cat = CatalogBuilder::new().add::<AImpl>().build();
 
     let builders: Vec<_> = cat.builders_for::<dyn A>().collect();
     assert_eq!(builders.len(), 1);
@@ -66,6 +64,7 @@ fn test_with_args_by_value() {
     }
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl {
         host: String,
         port: i32,
@@ -79,7 +78,6 @@ fn test_with_args_by_value() {
 
     let cat = CatalogBuilder::new()
         .add_builder(AImpl::builder().with_host("foo".to_owned()).with_port(8080))
-        .bind::<dyn A, AImpl>()
         .build();
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
@@ -91,7 +89,6 @@ fn test_with_args_by_value() {
                 .with_host_fn(|_| Ok("bar".to_owned()))
                 .with_port_fn(|_| Ok(8080)),
         )
-        .bind::<dyn A, AImpl>()
         .build();
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
@@ -105,6 +102,7 @@ fn test_with_args_by_ref() {
     }
 
     #[component]
+    #[interface(dyn A)]
     struct AImpl {
         b: Arc<dyn B>,
     }
@@ -128,6 +126,7 @@ fn test_with_args_by_ref() {
     }
 
     #[component]
+    #[interface(dyn B)]
     struct BImpl2;
 
     impl B for BImpl2 {
@@ -138,9 +137,7 @@ fn test_with_args_by_ref() {
 
     let cat = CatalogBuilder::new()
         .add_builder(AImpl::builder().with_b(Arc::new(BImpl1)))
-        .bind::<dyn A, AImpl>()
         .add::<BImpl2>()
-        .bind::<dyn B, BImpl2>()
         .build();
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
@@ -148,7 +145,6 @@ fn test_with_args_by_ref() {
 
     let cat = CatalogBuilder::new()
         .add_builder(AImpl::builder().with_b_fn(|_| Ok(Arc::new(BImpl1))))
-        .bind::<dyn A, AImpl>()
         .build();
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
@@ -167,6 +163,7 @@ fn test_new_ctor() {
     }
 
     #[component]
+    #[interface(dyn A)]
     impl AImpl {
         pub fn new(bee: Arc<dyn B>) -> Self {
             Self {
@@ -187,6 +184,7 @@ fn test_new_ctor() {
     }
 
     #[component]
+    #[interface(dyn B)]
     struct BImpl;
 
     impl B for BImpl {
@@ -195,12 +193,7 @@ fn test_new_ctor() {
         }
     }
 
-    let cat = CatalogBuilder::new()
-        .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
-        .add::<BImpl>()
-        .bind::<dyn B, BImpl>()
-        .build();
+    let cat = CatalogBuilder::new().add::<AImpl>().add::<BImpl>().build();
 
     let inst = cat.get::<OneOf<dyn A>>().unwrap();
     assert_eq!(inst.test(), "aimpl::bimpl::foo");
@@ -217,6 +210,7 @@ fn test_new_ctor_cloned() {
     }
 
     #[component]
+    #[interface(dyn A)]
     impl AImpl {
         pub fn new(bee: B) -> Self {
             Self { b: bee }
@@ -234,7 +228,6 @@ fn test_new_ctor_cloned() {
 
     let cat = CatalogBuilder::new()
         .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
         .add_value(B("foo".to_owned()))
         .build();
 
@@ -253,6 +246,7 @@ fn test_new_ctor_by_ref() {
     }
 
     #[component]
+    #[interface(dyn A)]
     impl AImpl {
         pub fn new(bee: &B) -> Self {
             Self { b: bee.0.clone() }
@@ -269,7 +263,6 @@ fn test_new_ctor_by_ref() {
 
     let cat = CatalogBuilder::new()
         .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
         .add_value(B("foo".to_owned()))
         .build();
 
@@ -308,7 +301,6 @@ fn test_generic_type_from_struct() {
 
     let cat = CatalogBuilder::new()
         .add::<AImpl<B>>()
-        .bind::<dyn A, AImpl<B>>()
         .add_value(B("foo".to_owned()))
         .build();
 
@@ -347,7 +339,6 @@ fn test_generic_type_from_impl() {
 
     let cat = CatalogBuilder::new()
         .add::<AImpl<u8>>()
-        .bind::<dyn A, AImpl<u8>>()
         .add_value(B("foo".to_owned()))
         .build();
 

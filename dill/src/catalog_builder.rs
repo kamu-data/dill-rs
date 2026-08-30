@@ -1,6 +1,5 @@
 use std::any::{TypeId, type_name};
 use std::collections::HashMap;
-use std::marker::Unsize;
 use std::sync::Arc;
 
 use multimap::MultiMap;
@@ -115,7 +114,7 @@ impl CatalogBuilder {
     pub fn bind<Iface, Impl>(&mut self) -> &mut Self
     where
         Iface: 'static + ?Sized,
-        Impl: 'static + Send + Sync + Unsize<Iface>,
+        Impl: 'static + Send + Sync + CastTo<Iface>,
     {
         let iface_type = IfaceTypeId(TypeId::of::<Iface>());
         let impl_type = ImplTypeId(TypeId::of::<Impl>());
@@ -129,13 +128,9 @@ impl CatalogBuilder {
             iface_type,
             Binding::new(
                 Arc::new(TypeCaster::<Iface> {
-                    cast_arc: |v| {
-                        // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the
-                        // `Impl` instances
-                        let s: Arc<Impl> = v.downcast().unwrap();
-                        let t: Arc<Iface> = s;
-                        t
-                    },
+                    // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the
+                    // `Impl` instances
+                    cast_arc: |v| Impl::cast(v.downcast().unwrap()),
                 }),
                 builder.unwrap().clone(),
             ),

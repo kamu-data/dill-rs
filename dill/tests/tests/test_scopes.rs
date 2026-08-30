@@ -14,6 +14,7 @@ fn test_transient() {
     }
 
     #[component]
+    #[interface(dyn A)]
     // #[scope(Transient)]  Expecting default
     struct AImpl {
         // Needed for compiler not to optimize type out
@@ -28,7 +29,6 @@ fn test_transient() {
 
     let cat = CatalogBuilder::new()
         .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
         .add_value("foo".to_owned())
         .build();
 
@@ -55,6 +55,7 @@ fn test_singleton() {
     }
 
     #[dill::component]
+    #[dill::interface(dyn A)]
     #[dill::scope(dill::Singleton)]
     struct AImpl {
         // Needed for compiler not to optimize type out
@@ -69,7 +70,6 @@ fn test_singleton() {
 
     let cat = dill::CatalogBuilder::new()
         .add::<AImpl>()
-        .bind::<dyn A, AImpl>()
         .add_value("foo".to_owned())
         .build();
 
@@ -100,6 +100,7 @@ fn test_chained_singleton() {
     }
 
     #[dill::component]
+    #[dill::interface(dyn A)]
     #[dill::scope(dill::Singleton)]
     impl AImpl {
         fn new(name: String, b: Option<Arc<dyn B>>) -> Self {
@@ -129,6 +130,7 @@ fn test_chained_singleton() {
     }
 
     #[dill::component]
+    #[dill::interface(dyn B)]
     #[dill::scope(dill::Singleton)]
     impl BImpl {
         pub fn new(last_name: String) -> Self {
@@ -146,7 +148,6 @@ fn test_chained_singleton() {
 
     let cat_earlier = dill::CatalogBuilder::new()
         .add_builder(AImpl::builder().with_name("test".to_string()))
-        .bind::<dyn A, AImpl>()
         .build();
 
     let cat_later = dill::CatalogBuilder::new_chained(&cat_earlier)

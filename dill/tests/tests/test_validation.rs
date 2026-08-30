@@ -14,6 +14,7 @@ fn test_validate_static_graph() {
 
     #[allow(dead_code)]
     #[component]
+    #[interface(dyn A)]
     struct AImpl {
         b: Arc<dyn B>,
     }
@@ -29,6 +30,7 @@ fn test_validate_static_graph() {
     }
 
     #[component]
+    #[interface(dyn B)]
     struct BImpl;
     impl B for BImpl {
         fn test(&self) -> String {
@@ -39,7 +41,6 @@ fn test_validate_static_graph() {
     // Unresolved
     let mut b = CatalogBuilder::new();
     b.add::<AImpl>();
-    b.bind::<dyn A, AImpl>();
 
     let res = b.validate();
     assert_matches!(
@@ -57,7 +58,6 @@ fn test_validate_static_graph() {
 
     // Success
     b.add::<BImpl>();
-    b.bind::<dyn B, BImpl>();
 
     assert_matches!(b.validate(), Ok(()));
 
@@ -89,6 +89,7 @@ fn test_validate_bound_fields() {
 
     #[allow(dead_code)]
     #[component]
+    #[interface(dyn A)]
     struct AImpl {
         foo: i32,
     }
@@ -96,7 +97,6 @@ fn test_validate_bound_fields() {
 
     let mut b = CatalogBuilder::new();
     b.add_builder(AImpl::builder().with_foo(10));
-    b.bind::<dyn A, AImpl>();
 
     b.validate().unwrap();
 }

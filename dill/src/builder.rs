@@ -188,6 +188,17 @@ pub trait TypedBuilderCast<I: Send + Sync + ?Sized> {
     fn cast(self) -> impl TypedBuilder<I>;
 }
 
+/// Asserts that `Self` can be coerced into `Arc<Iface>`.
+///
+/// Implemented automatically by the `#[interface(dyn Iface)]` attribute on
+/// `#[component]` structs. The implementation simply performs the unsizing
+/// coercion at the concrete call site where the compiler can verify it,
+/// letting [`CatalogBuilder::bind`] work on stable Rust without
+/// `#![feature(unsize)]`.
+pub trait CastTo<Iface: ?Sized> {
+    fn cast(self: Arc<Self>) -> Arc<Iface>;
+}
+
 /// Allows [CatalogBuilder::add()] to accept types with associated builder
 pub trait Component {
     type Impl: Send + Sync;
