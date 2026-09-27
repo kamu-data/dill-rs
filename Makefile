@@ -1,3 +1,5 @@
+STABLE_FEATURES="--features=tokio"
+
 ###############################################################################
 # Lint
 ###############################################################################
@@ -6,7 +8,7 @@
 lint:
 	cargo fmt --check
 	# cargo udeps --all-targets
-	cargo clippy --workspace --all-targets --all-features -- -D warnings
+	cargo clippy --workspace --all-targets ${STABLE_FEATURES} -- -D warnings
 
 
 ###############################################################################
@@ -15,7 +17,7 @@ lint:
 
 .PHONY: lint-fix
 lint-fix:
-	cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged --broken-code
+	cargo clippy --workspace --all-targets ${STABLE_FEATURES} --fix --allow-dirty --allow-staged --broken-code
 	cargo fmt --all
 
 ###############################################################################
@@ -24,4 +26,9 @@ lint-fix:
 
 .PHONY: test
 test:
-	cargo test --workspace --all-features
+	cargo test --workspace ${STABLE_FEATURES}
+
+
+.PHONY: test-nightly
+test-nightly:
+	cargo +nightly test --workspace --all-features

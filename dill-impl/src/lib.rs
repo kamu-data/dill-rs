@@ -1,3 +1,5 @@
+#![allow(clippy::needless_pass_by_value)]
+
 extern crate proc_macro;
 
 mod types;
@@ -613,10 +615,7 @@ fn get_do_get_dependency(
         }
         InjectionType::CatalogRef => quote! { cat },
         InjectionType::CatalogWeakRef => quote! { cat.weak_ref() },
-        InjectionType::Arc { inner } => {
-            quote! { cat.get_with_context::<::dill::OneOf::<#inner>>(ctx)? }
-        }
-        InjectionType::Reference { inner } => {
+        InjectionType::Arc { inner } | InjectionType::Reference { inner } => {
             quote! { cat.get_with_context::<::dill::OneOf::<#inner>>(ctx)? }
         }
         InjectionType::Option { element } => match element.as_ref() {
@@ -656,10 +655,7 @@ fn get_do_get_dependency_info(injection_type: &InjectionType) -> proc_macro2::To
         InjectionType::CatalogWeakRef => {
             quote! { ::dill::DependencyInfo::of::<::dill::CatalogWeakRef, ::dill::specs::OneOf::<::dill::CatalogWeakRef>>() }
         }
-        InjectionType::Arc { inner } => quote! {
-            ::dill::DependencyInfo::of::<#inner, ::dill::specs::OneOf::<#inner>>()
-        },
-        InjectionType::Reference { inner } => quote! {
+        InjectionType::Arc { inner } | InjectionType::Reference { inner } => quote! {
             ::dill::DependencyInfo::of::<#inner, ::dill::specs::OneOf::<#inner>>()
         },
         InjectionType::Option { element } => match element.as_ref() {

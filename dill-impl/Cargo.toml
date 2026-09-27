@@ -3,7 +3,6 @@ name = "dill-impl"
 description = "Implementation details of the dill DI library."
 categories = { workspace = true }
 version = { workspace = true }
-homepage = { workspace = true }
 repository = { workspace = true }
 authors = { workspace = true }
 readme = { workspace = true }

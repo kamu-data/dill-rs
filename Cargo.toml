@@ -8,7 +8,6 @@ default-members = ["dill-impl", "dill"]
 version = "0.17.1"
 edition = "2024"
 readme = "README.md"
-homepage = "https://github.com/kamu-data/dill-rs"
 repository = "https://github.com/kamu-data/dill-rs"
 documentation = "https://docs.rs/dill"
 categories = ["config", "development-tools"]
@@ -16,10 +15,6 @@ authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MIT OR Apache-2.0"
 keywords = ["di", "ioc", "dependency-injection", "dependency-inversion"]
 include = ["benches/*.rs", "src/**/*.rs", "Cargo.toml"]
-
-
-[workspace.lints.cargo]
-redundant_homepage = "allow"
 
 
 [workspace.lints.clippy]
