@@ -51,7 +51,7 @@ where
     }
 
     fn metadata<'b, 'c>(&'b self, clb: &'c mut dyn FnMut(&'b dyn Any) -> bool) {
-        self.builder.metadata(clb)
+        self.builder.metadata(clb);
     }
 
     fn get_any(

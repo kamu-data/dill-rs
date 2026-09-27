@@ -129,7 +129,9 @@ impl<Inner: DependencySpec + 'static> DependencySpec for Lazy<Inner> {
         // is used and only use the former as a fallback.
         let fallback_cat = cat.clone();
         Ok(crate::lazy::Lazy::new(
-            move || match crate::catalog::CURRENT_CATALOG.try_with(|cat| cat.get::<Inner>()) {
+            move || match crate::catalog::CURRENT_CATALOG
+                .try_with(super::catalog::Catalog::get::<Inner>)
+            {
                 Ok(v) => v,
                 Err(_) => fallback_cat.get::<Inner>(),
             },

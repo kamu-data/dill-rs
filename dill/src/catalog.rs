@@ -175,7 +175,7 @@ impl std::fmt::Debug for Catalog {
         write!(
             f,
             "Catalog(0x{:x})",
-            self.0.as_ref() as *const CatalogImpl as usize
+            std::ptr::from_ref::<CatalogImpl>(self.0.as_ref()) as usize
         )
     }
 }

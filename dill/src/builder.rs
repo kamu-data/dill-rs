@@ -199,7 +199,7 @@ pub trait CastTo<Iface: ?Sized> {
     fn cast(self: Arc<Self>) -> Arc<Iface>;
 }
 
-/// Allows [CatalogBuilder::add()] to accept types with associated builder
+/// Allows [`CatalogBuilder::add()`] to accept types with associated builder
 pub trait Component {
     type Impl: Send + Sync;
     type Builder: TypedBuilder<Self::Impl>;
@@ -354,7 +354,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Fn() -> Arc<T> acts as a builder
+/// `Fn() -> Arc<T>` acts as a builder
 impl<Fct, Impl> Builder for Fct
 where
     Fct: Fn() -> Arc<Impl> + Send + Sync,

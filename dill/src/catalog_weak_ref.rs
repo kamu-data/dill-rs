@@ -91,7 +91,7 @@ impl std::fmt::Debug for CatalogWeakRef {
                 return write!(
                     f,
                     "CatalogWeakRef(0x{:x})",
-                    p.as_ref() as *const CatalogImpl as usize
+                    std::ptr::from_ref::<CatalogImpl>(p.as_ref()) as usize
                 );
             }
         }

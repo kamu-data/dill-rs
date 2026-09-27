@@ -166,7 +166,7 @@ impl<T: Cache> Scope for Cached<T> {
     where
         Clb: FnOnce() -> Result<Arc<dyn Any + Send + Sync>, InjectionError>,
     {
-        let id = self as *const Self as usize;
+        let id = std::ptr::from_ref::<Self>(self) as usize;
         let cache = cat.get_one::<T>()?;
 
         if let Some(inst) = cache.get(id) {
@@ -241,7 +241,7 @@ impl Cache for TransactionCache {
 
     #[inline(always)]
     fn set(&self, id: usize, inst: Arc<dyn Any + Send + Sync>) {
-        self.0.set(id, inst)
+        self.0.set(id, inst);
     }
 }
 

@@ -28,8 +28,8 @@ fn test_macro_without_use() {
     let inst2 = cat.get_one::<dyn A>().unwrap();
 
     assert_ne!(
-        inst1.as_ref() as *const dyn A,
-        inst2.as_ref() as *const dyn A
+        std::ptr::from_ref::<dyn A>(inst1.as_ref()),
+        std::ptr::from_ref::<dyn A>(inst2.as_ref())
     );
 
     assert_eq!(inst1.test(), "aimpl::foo");

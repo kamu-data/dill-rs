@@ -36,8 +36,8 @@ fn test_transient() {
     let inst2 = cat.get::<OneOf<dyn A>>().unwrap();
 
     assert_ne!(
-        inst1.as_ref() as *const dyn A,
-        inst2.as_ref() as *const dyn A
+        std::ptr::from_ref::<dyn A>(inst1.as_ref()),
+        std::ptr::from_ref::<dyn A>(inst2.as_ref())
     );
 
     assert_eq!(inst1.test(), "aimpl::foo");
@@ -77,8 +77,8 @@ fn test_singleton() {
     let inst2 = cat.get::<dill::OneOf<dyn A>>().unwrap();
 
     assert_eq!(
-        inst1.as_ref() as *const dyn A,
-        inst2.as_ref() as *const dyn A
+        std::ptr::from_ref::<dyn A>(inst1.as_ref()),
+        std::ptr::from_ref::<dyn A>(inst2.as_ref())
     );
 
     assert_eq!(inst1.test(), "aimpl::foo");
@@ -158,33 +158,33 @@ fn test_chained_singleton() {
     let inst_a_1 = cat_earlier.get::<dill::OneOf<dyn A>>().unwrap();
     let inst_a_2 = cat_earlier.get::<dill::OneOf<dyn A>>().unwrap();
     assert_eq!(
-        inst_a_1.as_ref() as *const dyn A,
-        inst_a_2.as_ref() as *const dyn A
+        std::ptr::from_ref::<dyn A>(inst_a_1.as_ref()),
+        std::ptr::from_ref::<dyn A>(inst_a_2.as_ref())
     );
 
     let inst_a_3 = cat_later.get::<dill::OneOf<dyn A>>().unwrap();
     let inst_a_4 = cat_later.get::<dill::OneOf<dyn A>>().unwrap();
 
     assert_eq!(
-        inst_a_3.as_ref() as *const dyn A,
-        inst_a_4.as_ref() as *const dyn A
+        std::ptr::from_ref::<dyn A>(inst_a_3.as_ref()),
+        std::ptr::from_ref::<dyn A>(inst_a_4.as_ref())
     );
     assert_eq!(
-        inst_a_2.as_ref() as *const dyn A,
-        inst_a_3.as_ref() as *const dyn A
+        std::ptr::from_ref::<dyn A>(inst_a_2.as_ref()),
+        std::ptr::from_ref::<dyn A>(inst_a_3.as_ref())
     );
 
     let inst_b_1 = cat_later.get::<dill::OneOf<dyn B>>().unwrap();
     let inst_b_2 = cat_later.get::<dill::OneOf<dyn B>>().unwrap();
 
     assert_eq!(
-        inst_b_1.as_ref() as *const dyn B,
-        inst_b_2.as_ref() as *const dyn B
+        std::ptr::from_ref::<dyn B>(inst_b_1.as_ref()),
+        std::ptr::from_ref::<dyn B>(inst_b_2.as_ref())
     );
 
     assert_eq!(
-        inst_b_1.as_ref() as *const dyn B,
-        inst_b_2.as_ref() as *const dyn B
+        std::ptr::from_ref::<dyn B>(inst_b_1.as_ref()),
+        std::ptr::from_ref::<dyn B>(inst_b_2.as_ref())
     );
 
     assert_eq!(inst_a_1.test(), "aimpl::test::no-b");
@@ -233,7 +233,7 @@ fn test_scope_transaction() {
                 self.name.lock().unwrap(),
                 match &self.b {
                     Some(b) => b.test(),
-                    None => "".to_string(),
+                    None => String::new(),
                 }
             )
         }

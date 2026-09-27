@@ -19,6 +19,7 @@ include = ["benches/*.rs", "src/**/*.rs", "Cargo.toml"]
 
 [workspace.lints.clippy]
 # clippy::all (clippy::сorrectness, clippy::suspicious, clippy::style, clippy::complexity, clippy::perf)
+inline_always = "allow"
 new_without_default = "allow"
 too_many_arguments = "allow"
 module_inception = "allow"

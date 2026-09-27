@@ -18,7 +18,7 @@ fn get_type_package(_i: &TypeInfo) -> Option<String> {
 
 fn get_type_name(i: &TypeInfo) -> String {
     let iang = i.name.find('<').unwrap_or(i.name.len());
-    let icol = i.name[0..iang].rfind("::").map(|i| i + 2).unwrap_or(0);
+    let icol = i.name[0..iang].rfind("::").map_or(0, |i| i + 2);
 
     format!("\"{}\"", &i.name[icol..iang])
 }
@@ -27,7 +27,7 @@ fn get_type_name(i: &TypeInfo) -> String {
 
 fn get_type_scope(i: &TypeInfo) -> String {
     let name = if i.id == std::any::TypeId::of::<Transient>() {
-        "".to_string()
+        String::new()
     } else {
         i.name.to_lowercase().replace("dill::scopes::", "")
     };
@@ -88,7 +88,7 @@ pub fn render(cat: &Catalog) -> String {
 
     let ifaces: std::collections::HashSet<(Option<String>, String)> = cat
         .builders()
-        .flat_map(|b| b.interfaces_get_all())
+        .flat_map(super::super::builder::BuilderExt::interfaces_get_all)
         .map(|i| (get_type_package(&i), get_type_name(&i)))
         .collect();
     let mut ifaces: Vec<_> = ifaces.into_iter().collect();

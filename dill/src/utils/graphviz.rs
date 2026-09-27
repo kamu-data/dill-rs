@@ -4,7 +4,7 @@ use crate::*;
 
 fn get_type_name(i: &TypeInfo) -> String {
     let iang = i.name.find('<').unwrap_or(i.name.len());
-    let icol = i.name[0..iang].rfind("::").map(|i| i + 2).unwrap_or(0);
+    let icol = i.name[0..iang].rfind("::").map_or(0, |i| i + 2);
 
     format!("\"{}\"", &i.name[icol..iang])
 }

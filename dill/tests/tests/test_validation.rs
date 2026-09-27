@@ -112,7 +112,8 @@ fn test_validate_catalog_inject() {
 
     #[component]
     impl A {
-        pub fn new(catalog: CatalogWeakRef, _catalog_ref: &Catalog) -> Self {
+        #[allow(unused)]
+        pub fn new(catalog: CatalogWeakRef, catalog_ref: &Catalog) -> Self {
             Self { catalog }
         }
     }

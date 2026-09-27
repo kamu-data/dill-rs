@@ -68,7 +68,7 @@ fn test_metadata() {
         });
     }
 
-    metas.sort();
+    metas.sort_unstable();
     assert_eq!(
         metas,
         [
@@ -99,7 +99,7 @@ fn test_metadata() {
         .map(|b| b.instance_type().name)
         .collect::<Vec<_>>();
 
-    res.sort();
+    res.sort_unstable();
     assert_eq!(
         res,
         [
@@ -146,7 +146,7 @@ fn test_metadata() {
         .map(|b| b.instance_type().name)
         .collect::<Vec<_>>();
 
-    res.sort();
+    res.sort_unstable();
     assert_eq!(
         res,
         [

@@ -59,7 +59,7 @@ fn test_add_builder_fn() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-#[should_panic]
+#[should_panic = "Builder for type alloc::string::String is already registered"]
 fn test_add_impl_twice_panics() {
     let mut cat = CatalogBuilder::new();
     cat.add_value("foo".to_owned());
@@ -69,7 +69,7 @@ fn test_add_impl_twice_panics() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-#[should_panic]
+#[should_panic = "Builder for type unit::tests::test_catalog::test_bind_with_no_impl_panics::AImpl is not registered"]
 fn test_bind_with_no_impl_panics() {
     trait A: Send + Sync {}
 
@@ -114,6 +114,7 @@ fn test_self_injection_weak_ref() {
     #[component]
     #[interface(dyn B)]
     impl BImpl {
+        #[allow(clippy::needless_pass_by_value)]
         fn new(catalog: CatalogWeakRef) -> Self {
             Self {
                 c: catalog.get_one().unwrap(),

@@ -39,7 +39,7 @@ impl CatalogImpl {
     }
 
     pub fn builders<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn Builder> + 'a> {
-        let it_builders = self.builders.values().map(|b| b.as_ref());
+        let it_builders = self.builders.values().map(std::convert::AsRef::as_ref);
         if let Some(chained_catalog) = &self.chained_catalog {
             Box::new(it_builders.chain(chained_catalog.builders()))
         } else {

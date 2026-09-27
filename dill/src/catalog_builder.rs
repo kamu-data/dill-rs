@@ -44,7 +44,7 @@ impl CatalogBuilder {
 
     /// Registers a component using its associated builder.
     ///
-    /// Note that unlike [CatalogBuilder::add_builder()] this will also bind the
+    /// Note that unlike [`CatalogBuilder::add_builder()`] this will also bind the
     /// implementation to component's default interfaces.
     pub fn add<C>(&mut self) -> &mut Self
     where
@@ -61,12 +61,11 @@ impl CatalogBuilder {
         Bld: 'static + TypedBuilder<Impl>,
     {
         let key = ImplTypeId(TypeId::of::<Impl>());
-        if self.builders.contains_key(&key) {
-            panic!(
-                "Builder for type {} is already registered",
-                type_name::<Impl>()
-            );
-        }
+        assert!(
+            !self.builders.contains_key(&key),
+            "Builder for type {} is already registered",
+            type_name::<Impl>()
+        );
 
         let builder_arc = Arc::new(builder);
         self.builders.insert(key, builder_arc.clone());
@@ -121,9 +120,11 @@ impl CatalogBuilder {
         let impl_type = ImplTypeId(TypeId::of::<Impl>());
 
         let builder = self.builders.get(&impl_type);
-        if builder.is_none() {
-            panic!("Builder for type {} is not registered", type_name::<Impl>());
-        }
+        assert!(
+            builder.is_some(),
+            "Builder for type {} is not registered",
+            type_name::<Impl>()
+        );
 
         self.bindings.insert(
             iface_type,
@@ -188,7 +189,7 @@ impl CatalogBuilder {
     /// Validates the dependency graph returning a combined error.
     ///
     /// In case some of your types are registered dynamically you can
-    /// [ValidationErrorExt::ignore()] method which is implemented on the
+    /// [`ValidationErrorExt::ignore()`] method which is implemented on the
     /// Result type (you need to import the trait).
     ///
     /// Example:
