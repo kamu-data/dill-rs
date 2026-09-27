@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "nightly", feature(unsize))]
+
 //! Runtime dependency injection.
 //!
 //! Documentation is under construction!

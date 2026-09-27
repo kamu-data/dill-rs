@@ -111,6 +111,7 @@ impl CatalogBuilder {
         self
     }
 
+    #[cfg(not(feature = "nightly"))]
     pub fn bind<Iface, Impl>(&mut self) -> &mut Self
     where
         Iface: 'static + ?Sized,
@@ -131,6 +132,39 @@ impl CatalogBuilder {
                     // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the
                     // `Impl` instances
                     cast_arc: |v| Impl::cast(v.downcast().unwrap()),
+                }),
+                builder.unwrap().clone(),
+            ),
+        );
+
+        self
+    }
+
+    #[cfg(feature = "nightly")]
+    pub fn bind<Iface, Impl>(&mut self) -> &mut Self
+    where
+        Iface: 'static + ?Sized,
+        Impl: 'static + Send + Sync + std::marker::Unsize<Iface>,
+    {
+        let iface_type = IfaceTypeId(TypeId::of::<Iface>());
+        let impl_type = ImplTypeId(TypeId::of::<Impl>());
+
+        let builder = self.builders.get(&impl_type);
+        if builder.is_none() {
+            panic!("Builder for type {} is not registered", type_name::<Impl>());
+        }
+
+        self.bindings.insert(
+            iface_type,
+            Binding::new(
+                Arc::new(TypeCaster::<Iface> {
+                    cast_arc: |v| {
+                        // SAFETY: `TypeCaster<Iface>` is guaranteed to be invoked only on the
+                        // `Impl` instances
+                        let s: Arc<Impl> = v.downcast().unwrap();
+                        let t: Arc<Iface> = s;
+                        t
+                    },
                 }),
                 builder.unwrap().clone(),
             ),

@@ -1,2 +1,4 @@
 [toolchain]
+# Note: dill has "nightly" feature that removes some small
+# speed bumps using unstable features
 channel = "stable"

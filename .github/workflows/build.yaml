@@ -16,14 +16,24 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt, clippy
-      - run: cargo build --workspace --all-features
+      - run: cargo build --workspace --features tokio
       - run: cargo fmt --check
       - run: cargo clippy
   test_linux:
-    name: Test / Linux
+    name: Test / Linux (${{ matrix.toolchain }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - toolchain: stable
+            features: --features tokio
+          - toolchain: nightly
+            features: --all-features
     steps:
       - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - run: cargo build --workspace --all-features
-      - run: cargo test --verbose --workspace --all-features
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo build --workspace ${{ matrix.features }}
+      - run: cargo test --verbose --workspace ${{ matrix.features }}
