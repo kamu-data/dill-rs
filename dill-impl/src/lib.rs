@@ -497,7 +497,7 @@ fn implement_arg(
     // Used initialize the field that stores the override factory function or
     // an explicit argument
     let override_fn_field_ctor = if is_explicit {
-        quote! { #name: #name }
+        quote! { #name }
     } else {
         match &injection_type {
             InjectionType::Reference { .. }
